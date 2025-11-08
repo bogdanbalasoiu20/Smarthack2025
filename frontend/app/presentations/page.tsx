@@ -52,9 +52,11 @@ export default function PresentationsPage() {
           throw new Error("Failed to load presentations");
         }
 
-        const data = (await response.json()) as Presentation[];
+        const data = await response.json();
         if (isMounted) {
-          setPresentations(data);
+          // Handle both array and paginated responses
+          const presentationsArray = Array.isArray(data) ? data : (data.results || []);
+          setPresentations(presentationsArray);
           setError(null);
         }
       } catch (err) {
