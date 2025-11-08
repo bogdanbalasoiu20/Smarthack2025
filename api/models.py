@@ -1,59 +1,46 @@
 from django.db import models
 from django.contrib.auth.models import User, Group
-import uuid
 
 
 # ===== BRAND KIT =====
 class BrandKit(models.Model):
     """Brand identity settings (colors, fonts, logos) per group/organization"""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255)
-    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='brand_kits')
-
-    # JSON fields for flexibility
-    colors = models.JSONField(default=list, help_text="List of brand colors")
-    fonts = models.JSONField(default=list, help_text="List of font families")
-    logos = models.JSONField(default=list, help_text="List of logo URLs")
-
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+    colors = models.TextField()  # JSON stored as text
+    fonts = models.TextField()   # JSON stored as text
+    logos = models.TextField()   # JSON stored as text
+    is_default = models.IntegerField()
+    created_by = models.ForeignKey(User, models.DO_NOTHING, db_column='created_by_id')
+    group = models.ForeignKey(Group, models.DO_NOTHING, blank=True, null=True, db_column='group_id')
 
     class Meta:
-        db_table = 'api_brandkit'
         managed = False
+        db_table = 'api_brandkit'
 
     def __str__(self):
-        return f"{self.name} - {self.group.name}"
+        return self.name
 
 
 # ===== ASSET =====
 class Asset(models.Model):
     """Uploaded media assets (images, videos, icons)"""
-    ASSET_TYPES = [
-        ('IMAGE', 'Image'),
-        ('VIDEO', 'Video'),
-        ('ICON', 'Icon'),
-        ('AUDIO', 'Audio'),
-    ]
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255)
-    asset_type = models.CharField(max_length=20, choices=ASSET_TYPES)
-    file_url = models.URLField()
-    thumbnail_url = models.URLField(blank=True, null=True)
-
-    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='assets', null=True, blank=True)
-    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-
-    tags = models.JSONField(default=list, blank=True)
-    metadata = models.JSONField(default=dict, blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
+    asset_type = models.CharField(max_length=20)
+    file_url = models.CharField(max_length=500)
+    thumbnail_url = models.CharField(max_length=500)
+    tags = models.TextField()  # JSON stored as text
+    file_size = models.IntegerField()
+    created_at = models.DateTimeField()
+    group = models.ForeignKey(Group, models.DO_NOTHING, blank=True, null=True, db_column='group_id')
+    uploaded_by = models.ForeignKey(User, models.DO_NOTHING, db_column='uploaded_by_id')
 
     class Meta:
-        db_table = 'api_asset'
         managed = False
+        db_table = 'api_asset'
 
     def __str__(self):
         return self.name
@@ -62,30 +49,19 @@ class Asset(models.Model):
 # ===== PRESENTATION TEMPLATE =====
 class PresentationTemplate(models.Model):
     """Reusable presentation templates"""
-    CATEGORIES = [
-        ('EDUCATION', 'Education'),
-        ('BUSINESS', 'Business'),
-        ('MARKETING', 'Marketing'),
-        ('PITCH', 'Pitch Deck'),
-        ('REPORT', 'Report'),
-        ('OTHER', 'Other'),
-    ]
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
-    category = models.CharField(max_length=50, choices=CATEGORIES, default='OTHER')
-
-    thumbnail_url = models.URLField(blank=True, null=True)
-    structure = models.JSONField(default=dict, help_text="Template structure definition")
-
-    is_public = models.BooleanField(default=False)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    description = models.TextField()
+    category = models.CharField(max_length=50)
+    thumbnail_url = models.CharField(max_length=500)
+    structure = models.TextField()  # JSON stored as text
+    is_public = models.IntegerField()
+    created_at = models.DateTimeField()
+    created_by = models.ForeignKey(User, models.DO_NOTHING, db_column='created_by_id')
 
     class Meta:
-        db_table = 'api_presentationtemplate'
         managed = False
+        db_table = 'api_presentationtemplate'
 
     def __str__(self):
         return self.name
@@ -94,34 +70,24 @@ class PresentationTemplate(models.Model):
 # ===== PRESENTATION =====
 class Presentation(models.Model):
     """Main presentation entity"""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.BigAutoField(primary_key=True)
     title = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
-
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_presentations')
-    group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, related_name='presentations')
-    brand_kit = models.ForeignKey(BrandKit, on_delete=models.SET_NULL, null=True, blank=True)
-
-    # Canvas settings
-    canvas_settings = models.JSONField(default=dict)
-    presentation_path = models.JSONField(default=list, help_text="Ordered frame IDs for presentation flow")
-
-    # Metadata
-    thumbnail_url = models.URLField(blank=True, null=True)
-    is_template = models.BooleanField(default=False)
-    is_public = models.BooleanField(default=False)
-    share_token = models.CharField(max_length=64, unique=True, blank=True, null=True)
-
-    # Stats
-    view_count = models.IntegerField(default=0)
-    last_presented_at = models.DateTimeField(null=True, blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    description = models.TextField()
+    canvas_settings = models.TextField()  # JSON stored as text
+    presentation_path = models.TextField()  # JSON stored as text
+    thumbnail_url = models.CharField(max_length=500)
+    share_token = models.CharField(unique=True, max_length=64)
+    is_public = models.IntegerField()
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+    brand_kit = models.ForeignKey(BrandKit, models.DO_NOTHING, blank=True, null=True, db_column='brand_kit_id')
+    group = models.ForeignKey(Group, models.DO_NOTHING, blank=True, null=True, db_column='group_id')
+    owner = models.ForeignKey(User, models.DO_NOTHING, db_column='owner_id', related_name='owned_presentations')
+    template = models.ForeignKey(PresentationTemplate, models.DO_NOTHING, blank=True, null=True, db_column='template_id')
 
     class Meta:
-        db_table = 'api_presentation'
         managed = False
+        db_table = 'api_presentation'
         ordering = ['-updated_at']
 
     def __str__(self):
@@ -131,187 +97,148 @@ class Presentation(models.Model):
 # ===== PRESENTATION ACCESS =====
 class PresentationAccess(models.Model):
     """Granular access control for presentations"""
-    PERMISSIONS = [
-        ('VIEWER', 'Viewer'),
-        ('COMMENTER', 'Commenter'),
-        ('EDITOR', 'Editor'),
-    ]
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    presentation = models.ForeignKey(Presentation, on_delete=models.CASCADE, related_name='access_grants')
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    permission = models.CharField(max_length=20, choices=PERMISSIONS)
-
-    granted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='granted_accesses')
-    granted_at = models.DateTimeField(auto_now_add=True)
+    id = models.BigAutoField(primary_key=True)
+    permission = models.CharField(max_length=20)
+    granted_at = models.DateTimeField()
+    presentation = models.ForeignKey(Presentation, models.DO_NOTHING, db_column='presentation_id')
+    user = models.ForeignKey(User, models.DO_NOTHING, db_column='user_id')
+    granted_by = models.ForeignKey(User, models.DO_NOTHING, blank=True, null=True,
+                                   db_column='granted_by_id', related_name='granted_accesses')
 
     class Meta:
-        db_table = 'api_presentationaccess'
         managed = False
+        db_table = 'api_presentationaccess'
 
     def __str__(self):
-        return f"{self.user.username} - {self.permission} on {self.presentation.title}"
+        return f"{self.user.username} - {self.permission}"
 
 
 # ===== FRAME =====
 class Frame(models.Model):
     """Individual frames/slides in a presentation"""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    presentation = models.ForeignKey(Presentation, on_delete=models.CASCADE, related_name='frames')
-    title = models.CharField(max_length=255, blank=True)
-
-    # Position on canvas
-    position = models.JSONField(default=dict, help_text="x, y, width, height, rotation")
-
-    # Styling
-    background_color = models.CharField(max_length=7, default='#FFFFFF')
-    background_image = models.URLField(blank=True, null=True)
-
-    # Order for presentation flow
-    order = models.IntegerField(default=0)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    id = models.BigAutoField(primary_key=True)
+    title = models.CharField(max_length=255)
+    position = models.TextField()  # JSON stored as text
+    background_color = models.CharField(max_length=20)
+    background_image = models.CharField(max_length=500)
+    order = models.IntegerField()
+    thumbnail_url = models.CharField(max_length=500)
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+    presentation = models.ForeignKey(Presentation, models.DO_NOTHING, db_column='presentation_id',
+                                    related_name='frames')
 
     class Meta:
-        db_table = 'api_frame'
         managed = False
+        db_table = 'api_frame'
         ordering = ['order']
 
     def __str__(self):
-        return f"{self.presentation.title} - {self.title or 'Untitled'}"
+        return self.title or 'Untitled'
 
 
 # ===== FRAME CONNECTION =====
 class FrameConnection(models.Model):
     """Connections between frames for non-linear navigation"""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    from_frame = models.ForeignKey(Frame, on_delete=models.CASCADE, related_name='outgoing_connections')
-    to_frame = models.ForeignKey(Frame, on_delete=models.CASCADE, related_name='incoming_connections')
-
-    label = models.CharField(max_length=100, blank=True)
-    trigger_type = models.CharField(max_length=50, default='click', help_text="click, hover, auto")
-
-    created_at = models.DateTimeField(auto_now_add=True)
+    id = models.BigAutoField(primary_key=True)
+    label = models.CharField(max_length=100)
+    from_frame = models.ForeignKey(Frame, models.DO_NOTHING, db_column='from_frame_id',
+                                  related_name='outgoing_connections')
+    to_frame = models.ForeignKey(Frame, models.DO_NOTHING, db_column='to_frame_id',
+                                related_name='incoming_connections')
 
     class Meta:
-        db_table = 'api_frameconnection'
         managed = False
+        db_table = 'api_frameconnection'
+        unique_together = (('from_frame', 'to_frame'),)
 
     def __str__(self):
-        return f"{self.from_frame.title} -> {self.to_frame.title}"
+        return self.label or f"Connection {self.id}"
 
 
 # ===== ELEMENT =====
 class Element(models.Model):
     """Content elements within frames"""
-    ELEMENT_TYPES = [
-        ('TEXT', 'Text'),
-        ('IMAGE', 'Image'),
-        ('VIDEO', 'Video'),
-        ('SHAPE', 'Shape'),
-        ('ICON', 'Icon'),
-        ('CHART', 'Chart'),
-        ('TABLE', 'Table'),
-    ]
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    frame = models.ForeignKey(Frame, on_delete=models.CASCADE, related_name='elements')
-    element_type = models.CharField(max_length=20, choices=ELEMENT_TYPES)
-
-    # Position within frame
-    position = models.JSONField(default=dict, help_text="x, y, width, height, rotation, z-index")
-
-    # Content (type-specific data)
-    content = models.JSONField(default=dict)
-
-    # Styling
-    style = models.JSONField(default=dict, blank=True)
-
-    # Interactions
-    link_url = models.URLField(blank=True, null=True)
-    locked = models.BooleanField(default=False)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    id = models.BigAutoField(primary_key=True)
+    element_type = models.CharField(max_length=20)
+    position = models.TextField()  # JSON stored as text
+    content = models.TextField()   # JSON stored as text
+    link_url = models.CharField(max_length=500)
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+    frame = models.ForeignKey(Frame, models.DO_NOTHING, db_column='frame_id', related_name='elements')
 
     class Meta:
-        db_table = 'api_element'
         managed = False
+        db_table = 'api_element'
 
     def __str__(self):
-        return f"{self.element_type} in {self.frame.title}"
+        return f"{self.element_type} - {self.id}"
 
 
 # ===== COMMENT =====
 class Comment(models.Model):
     """Comments on presentations or specific frames"""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    presentation = models.ForeignKey(Presentation, on_delete=models.CASCADE, related_name='comments')
-    frame = models.ForeignKey(Frame, on_delete=models.CASCADE, null=True, blank=True, related_name='comments')
-
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
-    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
-
-    content = models.TextField()
-    position = models.JSONField(null=True, blank=True, help_text="Optional position marker on canvas")
-
-    is_resolved = models.BooleanField(default=False)
-    resolved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='resolved_comments')
-    resolved_at = models.DateTimeField(null=True, blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    id = models.BigAutoField(primary_key=True)
+    text = models.TextField()
+    position = models.TextField()  # JSON stored as text
+    is_resolved = models.IntegerField()
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+    author = models.ForeignKey(User, models.DO_NOTHING, db_column='author_id')
+    element = models.ForeignKey(Element, models.DO_NOTHING, blank=True, null=True,
+                               db_column='element_id', related_name='comments')
+    frame = models.ForeignKey(Frame, models.DO_NOTHING, blank=True, null=True,
+                             db_column='frame_id', related_name='comments')
+    presentation = models.ForeignKey(Presentation, models.DO_NOTHING, db_column='presentation_id',
+                                    related_name='comments')
 
     class Meta:
-        db_table = 'api_comment'
         managed = False
+        db_table = 'api_comment'
         ordering = ['created_at']
 
     def __str__(self):
-        return f"Comment by {self.author.username} on {self.presentation.title}"
+        return f"Comment by {self.author.username}"
 
 
 # ===== PRESENTATION VERSION =====
 class PresentationVersion(models.Model):
     """Version snapshots of presentations"""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    presentation = models.ForeignKey(Presentation, on_delete=models.CASCADE, related_name='versions')
+    id = models.BigAutoField(primary_key=True)
     version_number = models.IntegerField()
-
-    snapshot = models.JSONField(help_text="Full presentation data snapshot")
-    notes = models.TextField(blank=True)
-
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    snapshot = models.TextField()  # JSON stored as text
+    notes = models.TextField()
+    created_at = models.DateTimeField()
+    created_by = models.ForeignKey(User, models.DO_NOTHING, db_column='created_by_id')
+    presentation = models.ForeignKey(Presentation, models.DO_NOTHING, db_column='presentation_id',
+                                    related_name='versions')
 
     class Meta:
-        db_table = 'api_presentationversion'
         managed = False
+        db_table = 'api_presentationversion'
         ordering = ['-version_number']
 
     def __str__(self):
-        return f"{self.presentation.title} v{self.version_number}"
+        return f"v{self.version_number}"
 
 
 # ===== RECORDING =====
 class Recording(models.Model):
     """Recorded presentation sessions"""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    presentation = models.ForeignKey(Presentation, on_delete=models.CASCADE, related_name='recordings')
-
+    id = models.BigAutoField(primary_key=True)
     title = models.CharField(max_length=255)
-    recording_url = models.URLField()
-    duration = models.IntegerField(help_text="Duration in seconds")
-
-    share_token = models.CharField(max_length=64, unique=True, blank=True, null=True)
-
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
+    recording_url = models.CharField(max_length=500)
+    duration = models.IntegerField()
+    share_token = models.CharField(max_length=64)
+    created_at = models.DateTimeField()
+    created_by = models.ForeignKey(User, models.DO_NOTHING, db_column='created_by_id')
+    presentation = models.ForeignKey(Presentation, models.DO_NOTHING, db_column='presentation_id',
+                                    related_name='recordings')
 
     class Meta:
-        db_table = 'api_recording'
         managed = False
+        db_table = 'api_recording'
         ordering = ['-created_at']
 
     def __str__(self):
@@ -321,24 +248,39 @@ class Recording(models.Model):
 # ===== COLLABORATION SESSION =====
 class CollaborationSession(models.Model):
     """Active real-time collaboration sessions"""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    presentation = models.ForeignKey(Presentation, on_delete=models.CASCADE, related_name='sessions')
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-
-    # Presence data
-    cursor_position = models.JSONField(default=dict)
-    selected_element_id = models.UUIDField(null=True, blank=True)
-    color = models.CharField(max_length=7, default='#3B82F6')
-
-    # WebSocket connection
+    id = models.BigAutoField(primary_key=True)
+    cursor_position = models.TextField()  # JSON stored as text
+    selected_element_id = models.CharField(max_length=36, blank=True, null=True)
+    color = models.CharField(max_length=7)
     channel_name = models.CharField(max_length=255)
-
-    joined_at = models.DateTimeField(auto_now_add=True)
-    last_seen = models.DateTimeField(auto_now=True)
+    joined_at = models.DateTimeField()
+    last_seen = models.DateTimeField()
+    presentation = models.ForeignKey(Presentation, models.DO_NOTHING, db_column='presentation_id',
+                                    related_name='sessions')
+    user = models.ForeignKey(User, models.DO_NOTHING, db_column='user_id')
 
     class Meta:
-        db_table = 'api_collaborationsession'
         managed = False
+        db_table = 'api_collaborationsession'
 
     def __str__(self):
-        return f"{self.user.username} in {self.presentation.title}"
+        return f"{self.user.username} in session"
+
+
+# ===== ACCESS CONTROL ENTRY (legacy/compatibility) =====
+class AccessControlEntry(models.Model):
+    """Legacy access control - use PresentationAccess instead"""
+    id = models.BigAutoField(primary_key=True)
+    role = models.CharField(max_length=20)
+    granted_at = models.DateTimeField()
+    presentation = models.ForeignKey(Presentation, models.DO_NOTHING, db_column='presentation_id')
+    user = models.ForeignKey(User, models.DO_NOTHING, db_column='user_id')
+    granted_by = models.ForeignKey(User, models.DO_NOTHING, blank=True, null=True,
+                                  db_column='granted_by_id', related_name='granted_entries')
+
+    class Meta:
+        managed = False
+        db_table = 'api_accesscontrolentry'
+
+    def __str__(self):
+        return f"{self.user.username} - {self.role}"
