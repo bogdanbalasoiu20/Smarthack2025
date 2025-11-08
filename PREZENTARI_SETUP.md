@@ -4,13 +4,12 @@
 
 ```bash
 # În folder-ul principal (unde e manage.py)
-pip install channels daphne channels-redis
+pip install channels daphne
 ```
 
 **Note:**
 - `channels` - pentru WebSocket support
 - `daphne` - ASGI server
-- `channels-redis` - opțional, pentru producție (în dev folosim InMemory)
 
 ## 2. MIGRARE BAZĂ DE DATE
 
@@ -181,22 +180,8 @@ python manage.py createsuperuser
 
 ## 7. CONFIGURARE PRODUCȚIE
 
-### 7.1. Redis pentru Channels (recomandat producție)
-```bash
-# Instalează Redis
-# Windows: https://github.com/microsoftarchive/redis/releases
-# Linux: sudo apt install redis-server
-
-# Update settings.py
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],
-        },
-    },
-}
-```
+### 7.1. Channels fără backend extern
+Configurarea implicită folosește `channels.layers.InMemoryChannelLayer`, deci nu este nevoie de servicii suplimentare. Dacă ai nevoie de scalare orizontală în viitor, poți înlocui manual backend-ul cu o soluție externă (ex: PostgreSQL LISTEN/NOTIFY), dar setup-ul curent funcționează 100% în modul acesta.
 
 ### 7.2. Storage pentru media (S3/compatibil)
 Configurează în `settings.py`:
