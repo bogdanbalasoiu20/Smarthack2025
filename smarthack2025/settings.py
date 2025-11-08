@@ -76,12 +76,13 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'smarthack2025',
-        'USER': 'root',
-        'PASSWORD': '',
+        'USER': 'django_user',
+        'PASSWORD': 'django_pass',
         'HOST': 'localhost',
         'PORT': '3306',
     }
 }
+
 
 
 # Password validation
