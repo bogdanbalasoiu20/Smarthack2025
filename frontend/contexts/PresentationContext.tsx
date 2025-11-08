@@ -411,29 +411,45 @@ export function PresentationProvider({
   };
 
   const createElement = async (frameId: number, data: Partial<Element>) => {
-    if (!canEdit) return;
+    if (!canEdit) {
+      console.warn('Cannot create element: no edit permission');
+      return;
+    }
+
+    console.log('Creating element:', { frameId, data });
 
     try {
+      const payload = {
+        frame: frameId,
+        ...data,
+      };
+
+      console.log('Sending payload:', payload);
+
       const response = await fetch('http://localhost:8000/api/elements/', {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          frame: frameId,
-          ...data,
-        }),
+        body: JSON.stringify(payload),
       });
 
+      const responseText = await response.text();
+      console.log('Response status:', response.status);
+      console.log('Response text:', responseText);
+
       if (response.ok) {
-        const element = await response.json();
+        const element = JSON.parse(responseText);
+        console.log('Element created successfully:', element);
         const targetFrameId = element.frame || frameId;
         addElementLocal(targetFrameId, element);
         sendMessage({
           type: 'element_create',
           element,
         });
+      } else {
+        console.error('Failed to create element:', response.status, responseText);
       }
     } catch (error) {
       console.error('Error creating element:', error);
