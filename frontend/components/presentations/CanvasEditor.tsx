@@ -95,6 +95,7 @@ export default function CanvasEditor() {
     selectedElement,
     setSelectedElement,
     updateElement,
+    createElement,
     canEdit,
   } = usePresentation();
 
@@ -108,6 +109,7 @@ export default function CanvasEditor() {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [activeHandle, setActiveHandle] = useState<ResizeHandle | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Zoom cu scroll
   const handleWheel = (e: React.WheelEvent) => {
@@ -259,6 +261,114 @@ export default function CanvasEditor() {
     setSelectedElement(element);
   };
 
+  // Drag & Drop handlers for images and files
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (canEdit) {
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    if (!canEdit || !selectedFrame) return;
+
+    const files = Array.from(e.dataTransfer.files);
+    const imageUrl = e.dataTransfer.getData('image/url');
+    const assetData = e.dataTransfer.getData('application/json');
+
+    // Get drop position relative to frame
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const canvasRect = canvas.getBoundingClientRect();
+    const framePos = selectedFrame.position_parsed;
+
+    // Calculate position accounting for zoom and pan
+    const dropX = ((e.clientX - canvasRect.left - pan.x) / zoom) - framePos.x;
+    const dropY = ((e.clientY - canvasRect.top - pan.y) / zoom) - framePos.y;
+
+    // Handle dropped asset from panel
+    if (assetData) {
+      try {
+        const asset = JSON.parse(assetData);
+        await createElement({
+          element_type: asset.asset_type === 'IMAGE' ? 'IMAGE' : 'VIDEO',
+          position: {
+            x: Math.max(0, dropX),
+            y: Math.max(0, dropY),
+            width: 300,
+            height: 200,
+            rotation: 0,
+            z_index: 1,
+          },
+          content: {
+            url: asset.file_url,
+          },
+        });
+      } catch (err) {
+        console.error('Failed to parse asset data:', err);
+      }
+      return;
+    }
+
+    // Handle image URL from external source
+    if (imageUrl) {
+      await createElement({
+        element_type: 'IMAGE',
+        position: {
+          x: Math.max(0, dropX),
+          y: Math.max(0, dropY),
+          width: 300,
+          height: 200,
+          rotation: 0,
+          z_index: 1,
+        },
+        content: {
+          url: imageUrl,
+        },
+      });
+      return;
+    }
+
+    // Handle file upload
+    if (files.length > 0) {
+      for (const file of files) {
+        if (file.type.startsWith('image/')) {
+          // Create a temporary URL for the image
+          const objectUrl = URL.createObjectURL(file);
+
+          await createElement({
+            element_type: 'IMAGE',
+            position: {
+              x: Math.max(0, dropX),
+              y: Math.max(0, dropY),
+              width: 300,
+              height: 200,
+              rotation: 0,
+              z_index: 1,
+            },
+            content: {
+              url: objectUrl,
+              fileName: file.name,
+              // TODO: Upload file to server and update URL
+            },
+          });
+        }
+      }
+    }
+  };
+
   if (!selectedFrame) {
     return (
       <div className="w-full h-full flex items-center justify-center text-gray-500">
@@ -272,12 +382,17 @@ export default function CanvasEditor() {
   return (
     <div
       ref={canvasRef}
-      className="w-full h-full overflow-hidden bg-gray-200 relative cursor-move"
+      className={`w-full h-full overflow-hidden bg-gray-200 relative cursor-move ${
+        isDragOver ? 'ring-4 ring-blue-400 ring-inset' : ''
+      }`}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       {/* Canvas transformabil */}
       <div

@@ -61,6 +61,18 @@ export default function AssetsPanel() {
     });
   };
 
+  const handleDragStart = (e: React.DragEvent, asset: Asset) => {
+    // Set the asset data to be transferred
+    e.dataTransfer.setData('application/json', JSON.stringify(asset));
+    e.dataTransfer.effectAllowed = 'copy';
+
+    // Create a drag image
+    const img = e.currentTarget.querySelector('img');
+    if (img) {
+      e.dataTransfer.setDragImage(img, 50, 50);
+    }
+  };
+
   const filteredAssets = assets.filter((asset) => {
     const matchesSearch = asset.name.toLowerCase().includes(search.toLowerCase());
     const matchesType = !selectedType || asset.asset_type === selectedType;
@@ -112,8 +124,11 @@ export default function AssetsPanel() {
           {filteredAssets.map((asset) => (
             <div
               key={asset.id}
+              draggable={canEdit}
+              onDragStart={(e) => handleDragStart(e, asset)}
               onClick={() => handleAssetClick(asset)}
               className="cursor-pointer group"
+              title={canEdit ? "Drag to canvas or click to add" : "Click to add"}
             >
               <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200 group-hover:border-blue-500 transition-colors">
                 {asset.thumbnail_url || asset.file_url ? (
@@ -121,6 +136,7 @@ export default function AssetsPanel() {
                     src={asset.thumbnail_url || asset.file_url}
                     alt={asset.name}
                     className="w-full h-full object-cover"
+                    draggable={false}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
