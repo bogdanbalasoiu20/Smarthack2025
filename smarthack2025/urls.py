@@ -21,6 +21,7 @@ def home(request):
     return JsonResponse({"message": "Backend alive", "go_to": "/api/hello/"})
 
 urlpatterns = [
-    path('', home),  # adaugă asta
+    path('', home),
     path('api/', include('api.urls')),
+    path('api/games/', include('game_module.urls')),
 ]

@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-@a&@$9_v0x65$ip=)op8jp_&fams$au(qim6lfnwxd#$=b%lh3
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 
 # Application definition
@@ -42,26 +42,31 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'channels',
     'api',
-    'corsheaders'
+    'corsheaders',
+    'game_module',
+    'channels'
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
 ]
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "http://127.0.0.1:3000",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
+    "http://127.0.0.1:3000",
 ]
 
 ROOT_URLCONF = 'smarthack2025.urls'
@@ -102,7 +107,7 @@ CHANNEL_LAYERS = {
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
+        'ENGINE': 'mysql.connector.django',
         'NAME': 'smarthack2025',
         'USER': 'django_user',
         'PASSWORD': 'django_pass',
@@ -172,3 +177,19 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
 }
+
+
+ASGI_APPLICATION = 'smarthack2025.asgi.application'
+
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.pubsub.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("redis", 6379)], 
+        },
+    },
+}
+
+
+CORS_ALLOW_CREDENTIALS = True
