@@ -1,24 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api";
-
-type LoginResponse = {
-  token?: string;
-  message?: string;
-  user?: {
-    id: number;
-    username: string;
-    email: string;
-    first_name: string;
-    last_name: string;
-    role?: string | null;
-    groups?: string[];
-  };
-};
 
 // --- Iconițe SVG ---
 // Am înlocuit UserIcon și LockIcon cu variantele SVG de la FontAwesome,
@@ -102,7 +85,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/login/`, {
+      const response = await fetch("http://127.0.0.1:8000/api/login/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -113,32 +96,11 @@ export default function LoginPage() {
         }),
       });
 
-      const data: LoginResponse = await response.json();
+      const data = await response.json();
 
       if (response.ok) {
         if (data.token) {
           localStorage.setItem("authToken", data.token);
-        }
-        const userRole =
-          data.user?.role ||
-          (data.user?.groups && data.user.groups.length > 0
-            ? data.user.groups[0]
-            : null);
-        if (userRole) {
-          localStorage.setItem("userRole", userRole);
-        } else {
-          localStorage.removeItem("userRole");
-        }
-        if (data.user) {
-          const fullName = `${data.user.first_name ?? ""} ${
-            data.user.last_name ?? ""
-          }`
-            .trim()
-            .replace(/\s+/g, " ");
-          localStorage.setItem(
-            "userName",
-            fullName.length > 0 ? fullName : data.user.username
-          );
         }
         router.push("/dashboard");
       } else {
@@ -325,7 +287,7 @@ export default function LoginPage() {
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Don't have an account?{" "}
             <a
-              href="/register"
+              href="#"
               className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
             >
               Sign up
