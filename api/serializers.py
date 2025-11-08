@@ -27,10 +27,15 @@ class LoginSerializer(serializers.Serializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    groups = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'groups')
         read_only_fields = ('id',)
+
+    def get_groups(self, obj):
+        return [group.name for group in obj.groups.all()]
 
 
 class RegisterSerializer(serializers.ModelSerializer):
