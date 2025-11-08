@@ -34,10 +34,10 @@ class PresentationTemplateAdmin(admin.ModelAdmin):
 
 @admin.register(Presentation)
 class PresentationAdmin(admin.ModelAdmin):
-    list_display = ("title", "owner", "group", "is_public", "view_count", "created_at")
-    list_filter = ("is_public", "is_template", "created_at")
+    list_display = ("title", "owner", "group", "is_public", "created_at")
+    list_filter = ("is_public", "created_at")
     search_fields = ("title", "description", "owner__username")
-    raw_id_fields = ("owner", "group", "brand_kit")
+    raw_id_fields = ("owner", "group", "brand_kit", "template")
     readonly_fields = ("created_at", "updated_at")
 
 
@@ -59,29 +59,29 @@ class FrameAdmin(admin.ModelAdmin):
 
 @admin.register(FrameConnection)
 class FrameConnectionAdmin(admin.ModelAdmin):
-    list_display = ("from_frame", "to_frame", "label", "trigger_type", "created_at")
-    list_filter = ("trigger_type", "created_at")
+    list_display = ("from_frame", "to_frame", "label")
+    search_fields = ("label",)
     raw_id_fields = ("from_frame", "to_frame")
 
 
 @admin.register(Element)
 class ElementAdmin(admin.ModelAdmin):
-    list_display = ("element_type", "frame", "locked", "created_at")
-    list_filter = ("element_type", "locked", "created_at")
+    list_display = ("element_type", "frame", "created_at")
+    list_filter = ("element_type", "created_at")
     search_fields = ("frame__title", "frame__presentation__title")
     raw_id_fields = ("frame",)
 
 
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):
-    list_display = ("author", "presentation", "content_preview", "is_resolved", "created_at")
+    list_display = ("author", "presentation", "text_preview", "is_resolved", "created_at")
     list_filter = ("is_resolved", "created_at")
-    search_fields = ("content", "author__username", "presentation__title")
-    raw_id_fields = ("presentation", "frame", "author", "parent")
+    search_fields = ("text", "author__username", "presentation__title")
+    raw_id_fields = ("presentation", "frame", "author", "element")
 
-    def content_preview(self, obj):
-        return obj.content[:50] + "..." if len(obj.content) > 50 else obj.content
-    content_preview.short_description = "Content"
+    def text_preview(self, obj):
+        return obj.text[:50] + "..." if len(obj.text) > 50 else obj.text
+    text_preview.short_description = "Text"
 
 
 @admin.register(PresentationVersion)
