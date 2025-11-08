@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { usePresentation } from '@/contexts/PresentationContext';
 import { getStoredToken } from '@/lib/authToken';
+import { API_BASE_URL } from '@/lib/api';
 
 export default function AIPanel() {
   const { presentation, createElement, selectedFrame, canEdit } = usePresentation();
@@ -22,7 +23,7 @@ export default function AIPanel() {
     setLoading(true);
     try {
       const token = getStoredToken();
-      const response = await fetch('http://localhost:8000/api/presentations/ai/generate/', {
+      const response = await fetch(`${API_BASE_URL}/ai/generate/`, {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,
@@ -51,7 +52,7 @@ export default function AIPanel() {
     setLoading(true);
     try {
       const token = getStoredToken();
-      const response = await fetch('http://localhost:8000/api/presentations/ai/rewrite/', {
+      const response = await fetch(`${API_BASE_URL}/ai/rewrite/`, {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,
@@ -82,7 +83,7 @@ export default function AIPanel() {
     setLoading(true);
     try {
       const token = getStoredToken();
-      const response = await fetch('http://localhost:8000/api/presentations/ai/suggest-visuals/', {
+      const response = await fetch(`${API_BASE_URL}/ai/suggest-visuals/`, {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,

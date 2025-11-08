@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Search, Upload, Image as ImageIcon } from 'lucide-react';
 import { usePresentation } from '@/contexts/PresentationContext';
 import { getStoredToken } from '@/lib/authToken';
+import { API_BASE_URL } from '@/lib/api';
 
 interface Asset {
   id: number;
@@ -26,7 +27,7 @@ export default function AssetsPanel() {
   const fetchAssets = async () => {
     try {
       const token = getStoredToken();
-      const response = await fetch('http://localhost:8000/api/presentations/assets/', {
+      const response = await fetch(`${API_BASE_URL}/assets/`, {
         headers: {
           Authorization: `Token ${token}`,
         },
@@ -34,7 +35,8 @@ export default function AssetsPanel() {
 
       if (response.ok) {
         const data = await response.json();
-        setAssets(data);
+        const assetList = Array.isArray(data) ? data : data.results || [];
+        setAssets(assetList);
       }
     } catch (error) {
       console.error('Error fetching assets:', error);
