@@ -43,8 +43,7 @@ INSTALLED_APPS = [
     'channels',
     'api',
     'corsheaders',
-    'game_module',
-    'channels'
+    'game_module'
 ]
 
 MIDDLEWARE = [
@@ -89,15 +88,10 @@ TEMPLATES = [
 WSGI_APPLICATION = 'smarthack2025.wsgi.application'
 ASGI_APPLICATION = 'smarthack2025.asgi.application'
 
-# Channels
+# Channels (in-memory layer only)
 CHANNEL_LAYERS = {
     'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer'
-        # Pentru producție, folosește Redis:
-        # 'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        # 'CONFIG': {
-        #     "hosts": [('127.0.0.1', 6379)],
-        # },
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
     },
 }
 
@@ -176,19 +170,6 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
-}
-
-
-ASGI_APPLICATION = 'smarthack2025.asgi.application'
-
-
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.pubsub.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [("redis", 6379)], 
-        },
-    },
 }
 
 

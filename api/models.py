@@ -17,7 +17,7 @@ class BrandKit(models.Model):
     group = models.ForeignKey(Group, models.DO_NOTHING, blank=True, null=True, db_column='group_id')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'api_brandkit'
 
     def __str__(self):
@@ -39,7 +39,7 @@ class Asset(models.Model):
     uploaded_by = models.ForeignKey(User, models.DO_NOTHING, db_column='uploaded_by_id')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'api_asset'
 
     def __str__(self):
@@ -60,7 +60,7 @@ class PresentationTemplate(models.Model):
     created_by = models.ForeignKey(User, models.DO_NOTHING, db_column='created_by_id')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'api_presentationtemplate'
 
     def __str__(self):
@@ -86,7 +86,7 @@ class Presentation(models.Model):
     template = models.ForeignKey(PresentationTemplate, models.DO_NOTHING, blank=True, null=True, db_column='template_id')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'api_presentation'
         ordering = ['-updated_at']
 
@@ -107,7 +107,7 @@ class PresentationAccess(models.Model):
                                    db_column='granted_by_id', related_name='granted_accesses')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'api_presentationaccess'
 
     def __str__(self):
@@ -130,7 +130,7 @@ class Frame(models.Model):
                                     related_name='frames')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'api_frame'
         ordering = ['order']
 
@@ -149,7 +149,7 @@ class FrameConnection(models.Model):
                                 related_name='incoming_connections')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'api_frameconnection'
         unique_together = (('from_frame', 'to_frame'),)
 
@@ -170,7 +170,7 @@ class Element(models.Model):
     frame = models.ForeignKey(Frame, models.DO_NOTHING, db_column='frame_id', related_name='elements')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'api_element'
 
     def __str__(self):
@@ -195,7 +195,7 @@ class Comment(models.Model):
                                     related_name='comments')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'api_comment'
         ordering = ['created_at']
 
@@ -216,7 +216,7 @@ class PresentationVersion(models.Model):
                                     related_name='versions')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'api_presentationversion'
         ordering = ['-version_number']
 
@@ -238,7 +238,7 @@ class Recording(models.Model):
                                     related_name='recordings')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'api_recording'
         ordering = ['-created_at']
 
@@ -261,7 +261,7 @@ class CollaborationSession(models.Model):
     user = models.ForeignKey(User, models.DO_NOTHING, db_column='user_id')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'api_collaborationsession'
 
     def __str__(self):
@@ -274,13 +274,31 @@ class AccessControlEntry(models.Model):
     id = models.BigAutoField(primary_key=True)
     role = models.CharField(max_length=20)
     granted_at = models.DateTimeField()
-    presentation = models.ForeignKey(Presentation, models.DO_NOTHING, db_column='presentation_id')
-    user = models.ForeignKey(User, models.DO_NOTHING, db_column='user_id')
-    granted_by = models.ForeignKey(User, models.DO_NOTHING, blank=True, null=True,
-                                  db_column='granted_by_id', related_name='granted_entries')
+    presentation = models.ForeignKey(
+        Presentation,
+        models.DO_NOTHING,
+        db_column='presentation_id',
+        blank=True,
+        null=True,
+    )
+    user = models.ForeignKey(
+        User,
+        models.DO_NOTHING,
+        db_column='user_id',
+        blank=True,
+        null=True,
+    )
+    granted_by = models.ForeignKey(
+        User,
+        models.DO_NOTHING,
+        blank=True,
+        null=True,
+        db_column='granted_by_id',
+        related_name='granted_entries',
+    )
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'api_accesscontrolentry'
 
     def __str__(self):
