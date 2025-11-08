@@ -1,5 +1,10 @@
+"""
+Constants for the API application.
+"""
+
+# User roles/groups that can be assigned throughout the platform.
 ROLE_CHOICES = [
-    ("ELEV", "Elev"),
-    ("PROFESOR", "Profesor"),
     ("ADMIN", "Admin"),
+    ("PROFESOR", "Profesor"),
+    ("ELEV", "Elev"),
 ]
