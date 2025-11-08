@@ -164,7 +164,7 @@ class Element(models.Model):
     element_type = models.CharField(max_length=20)
     position = models.TextField()  # JSON stored as text
     content = models.TextField()   # JSON stored as text
-    link_url = models.CharField(max_length=500)
+    link_url = models.CharField(max_length=500, blank=True, default='')
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
     frame = models.ForeignKey(Frame, models.DO_NOTHING, db_column='frame_id', related_name='elements')
