@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { setStoredToken } from "@/lib/authToken";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -32,7 +33,9 @@ export default function LoginPage() {
       if (response.ok) {
         // Store token if your Django API returns one
         if (data.token) {
-          localStorage.setItem("authToken", data.token);
+          setStoredToken(data.token);
+        } else {
+          setStoredToken(null);
         }
         // Redirect to dashboard
         router.push("/dashboard");

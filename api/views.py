@@ -12,8 +12,9 @@ from .serializers import (
     FrameSerializer, ElementSerializer, CommentSerializer,
     AccessControlEntrySerializer
 )
+from django.contrib.auth.models import User
 from .models import (
-    User, Presentation, Frame, Element, Comment, AccessControlEntry
+    Presentation, Frame, Element, Comment, AccessControlEntry
 )
 
 
@@ -115,7 +116,7 @@ class PresentationViewSet(viewsets.ModelViewSet):
         return Presentation.objects.filter(
             django_models.Q(owner=user) |
             django_models.Q(access_entries__user=user) |
-            django_models.Q(is_public=True, organization=user.organization)
+            django_models.Q(is_public=True)
         ).distinct()
 
     def perform_create(self, serializer):
@@ -127,7 +128,6 @@ class PresentationViewSet(viewsets.ModelViewSet):
         })
         serializer.save(
             owner=self.request.user,
-            organization=self.request.user.organization,
             canvas_config=canvas_config
         )
 
@@ -141,7 +141,6 @@ class PresentationViewSet(viewsets.ModelViewSet):
             title=f"{original.title} (Copy)",
             description=original.description,
             owner=request.user,
-            organization=request.user.organization,
             canvas_config=original.canvas_config,
             is_public=False
         )

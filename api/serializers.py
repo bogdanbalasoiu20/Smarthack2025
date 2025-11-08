@@ -1,9 +1,12 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
+from django.contrib.auth import get_user_model
 from .models import (
-    User, Organization, Presentation, Frame, Element,
+    Presentation, Frame, Element,
     Comment, CollaborationSession, AccessControlEntry
 )
+
+User = get_user_model()
 
 
 class LoginSerializer(serializers.Serializer):
@@ -30,12 +33,9 @@ class LoginSerializer(serializers.Serializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    organization_name = serializers.CharField(source='organization.name', read_only=True)
-
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name',
-                 'avatar_url', 'organization', 'organization_name', 'role')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name')
         read_only_fields = ('id',)
 
 
@@ -60,16 +60,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             **validated_data
         )
         return user
-
-
-class OrganizationSerializer(serializers.ModelSerializer):
-    member_count = serializers.IntegerField(source='members.count', read_only=True)
-
-    class Meta:
-        model = Organization
-        fields = ('id', 'name', 'slug', 'plan', 'max_members',
-                 'max_storage_gb', 'member_count', 'created_at')
-        read_only_fields = ('id', 'created_at')
 
 
 class ElementSerializer(serializers.ModelSerializer):
@@ -102,7 +92,7 @@ class PresentationListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Presentation
         fields = ('id', 'title', 'description', 'thumbnail_url',
-                 'owner', 'owner_name', 'organization',
+                 'owner', 'owner_name',
                  'is_public', 'frame_count', 'view_count',
                  'created_at', 'updated_at', 'last_presented_at')
         read_only_fields = ('id', 'owner', 'created_at', 'updated_at')
@@ -116,7 +106,7 @@ class PresentationDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Presentation
         fields = ('id', 'title', 'description', 'owner', 'owner_name',
-                 'organization', 'canvas_config', 'viewport_state',
+                 'canvas_config', 'viewport_state',
                  'thumbnail_url', 'is_template', 'is_public', 'share_token',
                  'frames', 'elements', 'view_count', 'created_at',
                  'updated_at', 'last_presented_at')
@@ -125,13 +115,12 @@ class PresentationDetailSerializer(serializers.ModelSerializer):
 
 class CommentSerializer(serializers.ModelSerializer):
     author_name = serializers.CharField(source='author.username', read_only=True)
-    author_avatar = serializers.URLField(source='author.avatar_url', read_only=True)
     replies = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
         fields = ('id', 'presentation', 'frame', 'element', 'author',
-                 'author_name', 'author_avatar', 'parent', 'content',
+                 'author_name', 'parent', 'content',
                  'position', 'is_resolved', 'resolved_by', 'resolved_at',
                  'replies', 'created_at', 'updated_at')
         read_only_fields = ('id', 'author', 'created_at', 'updated_at')
@@ -144,11 +133,10 @@ class CommentSerializer(serializers.ModelSerializer):
 
 class CollaborationSessionSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.username', read_only=True)
-    user_avatar = serializers.URLField(source='user.avatar_url', read_only=True)
 
     class Meta:
         model = CollaborationSession
-        fields = ('id', 'presentation', 'user', 'user_name', 'user_avatar',
+        fields = ('id', 'presentation', 'user', 'user_name',
                  'cursor_position', 'selected_element_id', 'viewport_state',
                  'color', 'joined_at', 'last_seen')
         read_only_fields = ('id', 'joined_at', 'last_seen')
