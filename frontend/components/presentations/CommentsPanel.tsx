@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Send, Check } from 'lucide-react';
 import { usePresentation } from '@/contexts/PresentationContext';
 import { getStoredToken } from '@/lib/authToken';
+import { API_BASE_URL } from '@/lib/api';
 
 interface Comment {
   id: number;
@@ -32,7 +33,7 @@ export default function CommentsPanel() {
     try {
       const token = getStoredToken();
       const response = await fetch(
-        `http://localhost:8000/api/comments/?presentation=${presentation?.id}`,
+        `${API_BASE_URL}/comments/?presentation=${presentation?.id}`,
         {
           headers: {
             Authorization: `Token ${token}`,
@@ -55,7 +56,7 @@ export default function CommentsPanel() {
     setLoading(true);
     try {
       const token = getStoredToken();
-      const response = await fetch('http://localhost:8000/api/comments/', {
+      const response = await fetch(`${API_BASE_URL}/comments/`, {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,
@@ -82,15 +83,12 @@ export default function CommentsPanel() {
   const handleResolve = async (commentId: number) => {
     try {
       const token = getStoredToken();
-      await fetch(
-        `http://localhost:8000/api/comments/${commentId}/resolve/`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Token ${token}`,
-          },
-        }
-      );
+      await fetch(`${API_BASE_URL}/comments/${commentId}/resolve/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${token}`,
+        },
+      });
       fetchComments();
     } catch (error) {
       console.error('Error resolving comment:', error);

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { getStoredToken } from '@/lib/authToken';
+import { API_BASE_URL, WS_BASE_URL } from '@/lib/api';
 
 interface Frame {
   id: number;
@@ -224,7 +225,7 @@ export function PresentationProvider({
 
   // WebSocket pentru colaborare
   const { sendMessage } = useWebSocket(
-    `ws://localhost:8000/ws/presentations/${presentationId}/`,
+    `${WS_BASE_URL}/ws/presentations/${presentationId}/`,
     {
       onMessage: (data) => {
         handleWebSocketMessage(data);
@@ -237,14 +238,11 @@ export function PresentationProvider({
 
   const fetchPresentation = useCallback(async () => {
     try {
-      const response = await fetch(
-        `http://localhost:8000/api/presentations/${presentationId}/`,
-        {
-          headers: {
-            Authorization: `Token ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/presentations/${presentationId}/`, {
+        headers: {
+          Authorization: `Token ${token}`,
+        },
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -311,17 +309,14 @@ export function PresentationProvider({
     if (!canEdit) return;
 
     try {
-      const response = await fetch(
-        `http://localhost:8000/api/frames/${frameId}/`,
-        {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Token ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(data),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/frames/${frameId}/`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Token ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
 
       if (response.ok) {
         // Broadcast prin WebSocket
@@ -377,7 +372,7 @@ export function PresentationProvider({
     }
 
     try {
-      await fetch(`http://localhost:8000/api/elements/${elementId}/`, {
+      await fetch(`${API_BASE_URL}/elements/${elementId}/`, {
         method: 'PATCH',
         headers: {
           Authorization: `Token ${token}`,
@@ -394,7 +389,7 @@ export function PresentationProvider({
     if (!canEdit) return;
 
     try {
-      const response = await fetch('http://localhost:8000/api/frames/', {
+      const response = await fetch(`${API_BASE_URL}/frames/`, {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,
@@ -430,7 +425,7 @@ export function PresentationProvider({
 
       console.log('Sending payload:', payload);
 
-      const response = await fetch('http://localhost:8000/api/elements/', {
+      const response = await fetch(`${API_BASE_URL}/elements/`, {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,
@@ -464,7 +459,7 @@ export function PresentationProvider({
     if (!canEdit) return;
 
     try {
-      await fetch(`http://localhost:8000/api/frames/${frameId}/`, {
+      await fetch(`${API_BASE_URL}/frames/${frameId}/`, {
         method: 'DELETE',
         headers: {
           Authorization: `Token ${token}`,
@@ -487,7 +482,7 @@ export function PresentationProvider({
     });
 
     try {
-      await fetch(`http://localhost:8000/api/elements/${elementId}/`, {
+      await fetch(`${API_BASE_URL}/elements/${elementId}/`, {
         method: 'DELETE',
         headers: {
           Authorization: `Token ${token}`,
