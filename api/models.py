@@ -100,7 +100,8 @@ class PresentationAccess(models.Model):
     id = models.BigAutoField(primary_key=True)
     permission = models.CharField(max_length=20)
     granted_at = models.DateTimeField()
-    presentation = models.ForeignKey(Presentation, models.DO_NOTHING, db_column='presentation_id')
+    presentation = models.ForeignKey(Presentation, models.DO_NOTHING, db_column='presentation_id',
+                                    related_name='access_grants')
     user = models.ForeignKey(User, models.DO_NOTHING, db_column='user_id')
     granted_by = models.ForeignKey(User, models.DO_NOTHING, blank=True, null=True,
                                    db_column='granted_by_id', related_name='granted_accesses')
