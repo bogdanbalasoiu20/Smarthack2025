@@ -274,10 +274,28 @@ class AccessControlEntry(models.Model):
     id = models.BigAutoField(primary_key=True)
     role = models.CharField(max_length=20)
     granted_at = models.DateTimeField()
-    presentation = models.ForeignKey(Presentation, models.DO_NOTHING, db_column='presentation_id')
-    user = models.ForeignKey(User, models.DO_NOTHING, db_column='user_id')
-    granted_by = models.ForeignKey(User, models.DO_NOTHING, blank=True, null=True,
-                                  db_column='granted_by_id', related_name='granted_entries')
+    presentation = models.ForeignKey(
+        Presentation,
+        models.DO_NOTHING,
+        db_column='presentation_id',
+        blank=True,
+        null=True,
+    )
+    user = models.ForeignKey(
+        User,
+        models.DO_NOTHING,
+        db_column='user_id',
+        blank=True,
+        null=True,
+    )
+    granted_by = models.ForeignKey(
+        User,
+        models.DO_NOTHING,
+        blank=True,
+        null=True,
+        db_column='granted_by_id',
+        related_name='granted_entries',
+    )
 
     class Meta:
         managed = True
