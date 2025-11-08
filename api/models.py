@@ -20,7 +20,8 @@ class BrandKit(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'brand_kits'
+        db_table = 'api_brandkit'
+        managed = False
 
     def __str__(self):
         return f"{self.name} - {self.group.name}"
@@ -51,11 +52,8 @@ class Asset(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'assets'
-        indexes = [
-            models.Index(fields=['asset_type']),
-            models.Index(fields=['group']),
-        ]
+        db_table = 'api_asset'
+        managed = False
 
     def __str__(self):
         return self.name
@@ -86,7 +84,8 @@ class PresentationTemplate(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'presentation_templates'
+        db_table = 'api_presentationtemplate'
+        managed = False
 
     def __str__(self):
         return self.name
@@ -121,11 +120,8 @@ class Presentation(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'presentations'
-        indexes = [
-            models.Index(fields=['owner', 'created_at']),
-            models.Index(fields=['group']),
-        ]
+        db_table = 'api_presentation'
+        managed = False
         ordering = ['-updated_at']
 
     def __str__(self):
@@ -150,8 +146,8 @@ class PresentationAccess(models.Model):
     granted_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'presentation_access'
-        unique_together = [['presentation', 'user']]
+        db_table = 'api_presentationaccess'
+        managed = False
 
     def __str__(self):
         return f"{self.user.username} - {self.permission} on {self.presentation.title}"
@@ -178,10 +174,8 @@ class Frame(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'frames'
-        indexes = [
-            models.Index(fields=['presentation', 'order']),
-        ]
+        db_table = 'api_frame'
+        managed = False
         ordering = ['order']
 
     def __str__(self):
@@ -201,8 +195,8 @@ class FrameConnection(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'frame_connections'
-        unique_together = [['from_frame', 'to_frame']]
+        db_table = 'api_frameconnection'
+        managed = False
 
     def __str__(self):
         return f"{self.from_frame.title} -> {self.to_frame.title}"
@@ -242,10 +236,8 @@ class Element(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'elements'
-        indexes = [
-            models.Index(fields=['frame', 'element_type']),
-        ]
+        db_table = 'api_element'
+        managed = False
 
     def __str__(self):
         return f"{self.element_type} in {self.frame.title}"
@@ -272,7 +264,8 @@ class Comment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'comments'
+        db_table = 'api_comment'
+        managed = False
         ordering = ['created_at']
 
     def __str__(self):
@@ -293,9 +286,9 @@ class PresentationVersion(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'presentation_versions'
+        db_table = 'api_presentationversion'
+        managed = False
         ordering = ['-version_number']
-        unique_together = [['presentation', 'version_number']]
 
     def __str__(self):
         return f"{self.presentation.title} v{self.version_number}"
@@ -317,7 +310,8 @@ class Recording(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'recordings'
+        db_table = 'api_recording'
+        managed = False
         ordering = ['-created_at']
 
     def __str__(self):
@@ -343,10 +337,8 @@ class CollaborationSession(models.Model):
     last_seen = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'collaboration_sessions'
-        indexes = [
-            models.Index(fields=['presentation', 'user']),
-        ]
+        db_table = 'api_collaborationsession'
+        managed = False
 
     def __str__(self):
         return f"{self.user.username} in {self.presentation.title}"
