@@ -35,6 +35,10 @@ interface Element {
   };
   content: string;
   content_parsed: any;
+  link_url: string;
+  frame?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface Presentation {
