@@ -1,10 +1,7 @@
-<<<<<<< Updated upstream
-=======
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { setStoredToken } from "@/lib/authToken";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api";
@@ -153,9 +150,7 @@ export default function RegisterPage() {
 
       if (response.ok) {
         if (data.token) {
-          setStoredToken(data.token);
-        } else {
-          setStoredToken(null);
+          localStorage.setItem("authToken", data.token);
         }
         const userRole =
           data.user?.role ||
@@ -451,4 +446,3 @@ export default function RegisterPage() {
     </div>
   );
 }
->>>>>>> Stashed changes

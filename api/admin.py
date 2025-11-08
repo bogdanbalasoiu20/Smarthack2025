@@ -1,37 +1,75 @@
 from django.contrib import admin
 from .models import (
-    Presentation,
-    Frame,
-    Element,
-    Comment,
-    CollaborationSession,
-    AccessControlEntry,
+    BrandKit, Asset, PresentationTemplate,
+    Presentation, PresentationAccess,
+    Frame, FrameConnection, Element,
+    Comment, PresentationVersion, Recording,
+    CollaborationSession
 )
+
+
+@admin.register(BrandKit)
+class BrandKitAdmin(admin.ModelAdmin):
+    list_display = ("name", "group", "created_by", "created_at")
+    list_filter = ("created_at", "group")
+    search_fields = ("name",)
+    raw_id_fields = ("created_by", "group")
+
+
+@admin.register(Asset)
+class AssetAdmin(admin.ModelAdmin):
+    list_display = ("name", "asset_type", "group", "uploaded_by", "created_at")
+    list_filter = ("asset_type", "created_at")
+    search_fields = ("name",)
+    raw_id_fields = ("uploaded_by", "group")
+
+
+@admin.register(PresentationTemplate)
+class PresentationTemplateAdmin(admin.ModelAdmin):
+    list_display = ("name", "category", "is_public", "created_by", "created_at")
+    list_filter = ("category", "is_public", "created_at")
+    search_fields = ("name", "description")
+    raw_id_fields = ("created_by",)
 
 
 @admin.register(Presentation)
 class PresentationAdmin(admin.ModelAdmin):
-    list_display = ("title", "owner", "is_public", "view_count", "created_at")
+    list_display = ("title", "owner", "group", "is_public", "view_count", "created_at")
     list_filter = ("is_public", "is_template", "created_at")
     search_fields = ("title", "description", "owner__username")
-    raw_id_fields = ("owner",)
+    raw_id_fields = ("owner", "group", "brand_kit")
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(PresentationAccess)
+class PresentationAccessAdmin(admin.ModelAdmin):
+    list_display = ("user", "presentation", "permission", "granted_by", "granted_at")
+    list_filter = ("permission", "granted_at")
+    search_fields = ("user__username", "presentation__title")
+    raw_id_fields = ("presentation", "user", "granted_by")
 
 
 @admin.register(Frame)
 class FrameAdmin(admin.ModelAdmin):
-    list_display = ("title", "presentation", "order_index", "x", "y", "width", "height")
+    list_display = ("title", "presentation", "order", "background_color", "created_at")
     list_filter = ("created_at",)
     search_fields = ("title", "presentation__title")
     raw_id_fields = ("presentation",)
 
 
+@admin.register(FrameConnection)
+class FrameConnectionAdmin(admin.ModelAdmin):
+    list_display = ("from_frame", "to_frame", "label", "trigger_type", "created_at")
+    list_filter = ("trigger_type", "created_at")
+    raw_id_fields = ("from_frame", "to_frame")
+
+
 @admin.register(Element)
 class ElementAdmin(admin.ModelAdmin):
-    list_display = ("type", "presentation", "frame", "x", "y", "width", "height", "z_index")
-    list_filter = ("type", "locked", "created_at")
-    search_fields = ("presentation__title",)
-    raw_id_fields = ("presentation", "frame")
+    list_display = ("element_type", "frame", "locked", "created_at")
+    list_filter = ("element_type", "locked", "created_at")
+    search_fields = ("frame__title", "frame__presentation__title")
+    raw_id_fields = ("frame",)
 
 
 @admin.register(Comment)
@@ -39,12 +77,27 @@ class CommentAdmin(admin.ModelAdmin):
     list_display = ("author", "presentation", "content_preview", "is_resolved", "created_at")
     list_filter = ("is_resolved", "created_at")
     search_fields = ("content", "author__username", "presentation__title")
-    raw_id_fields = ("presentation", "frame", "element", "author", "parent")
+    raw_id_fields = ("presentation", "frame", "author", "parent")
 
     def content_preview(self, obj):
         return obj.content[:50] + "..." if len(obj.content) > 50 else obj.content
-
     content_preview.short_description = "Content"
+
+
+@admin.register(PresentationVersion)
+class PresentationVersionAdmin(admin.ModelAdmin):
+    list_display = ("presentation", "version_number", "created_by", "created_at")
+    list_filter = ("created_at",)
+    search_fields = ("presentation__title", "notes")
+    raw_id_fields = ("presentation", "created_by")
+
+
+@admin.register(Recording)
+class RecordingAdmin(admin.ModelAdmin):
+    list_display = ("title", "presentation", "duration", "created_by", "created_at")
+    list_filter = ("created_at",)
+    search_fields = ("title", "presentation__title")
+    raw_id_fields = ("presentation", "created_by")
 
 
 @admin.register(CollaborationSession)
@@ -53,11 +106,3 @@ class CollaborationSessionAdmin(admin.ModelAdmin):
     list_filter = ("joined_at", "last_seen")
     search_fields = ("user__username", "presentation__title")
     raw_id_fields = ("presentation", "user")
-
-
-@admin.register(AccessControlEntry)
-class AccessControlEntryAdmin(admin.ModelAdmin):
-    list_display = ("user", "presentation", "role", "granted_by", "granted_at")
-    list_filter = ("role", "granted_at")
-    search_fields = ("user__username", "presentation__title")
-    raw_id_fields = ("presentation", "user", "granted_by")
