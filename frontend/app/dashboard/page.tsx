@@ -1,6 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api";
+
+type BackendUser = {
+  id: number;
+  username: string;
+  email?: string;
+  first_name: string;
+  last_name: string;
+  role?: string | null;
+  groups?: string[];
+};
 
 // --- Definiții Iconițe (Inline SVG) ---
 // ... iconițe existente ...
@@ -392,7 +406,7 @@ const NavItem = ({ icon: Icon, label, active = false, href = "#" }) => {
 /**
  * Sidebar: Meniul lateral de navigare (ACUM DINAMIC)
  */
-const Sidebar = ({ isSidebarOpen, userRole }) => {
+const Sidebar = ({ isSidebarOpen, userRole, onLogout = () => {} }) => {
   // Simulare pentru link-ul activ
   const [activeLink, setActiveLink] = useState("Dashboard");
 
@@ -494,22 +508,18 @@ const Sidebar = ({ isSidebarOpen, userRole }) => {
       {/* Partea de jos a sidebar-ului */}
       <div className="p-4 border-t border-gray-700">
         <NavItem icon={Settings} label="Setări" />
-        <a
-          href="#" // Ar trebui să gestioneze delogarea
+        <button
+          type="button"
           className="
             flex items-center w-full px-4 py-2.5 mt-2 rounded-lg text-sm font-medium
             text-red-400 hover:text-white hover:bg-red-500
-            transition-colors duration-150
+            transition-colors duration-150 text-left
           "
-          onClick={() => {
-            localStorage.removeItem("userRole");
-            localStorage.removeItem("authToken");
-            window.location.href = "/login";
-          }}
+          onClick={onLogout}
         >
           <LogOut className="h-5 w-5 mr-3" />
           Delogare
-        </a>
+        </button>
       </div>
     </aside>
   );
@@ -892,26 +902,111 @@ const AdminDashboard = () => {
 // --- COMPONENTA PRINCIPALĂ (Controller-ul) ---
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [userRole, setUserRole] = useState(null); // Ex: 'ELEV', 'PROFESOR', 'ADMIN'
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [userName, setUserName] = useState("Utilizator");
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // La încărcarea paginii, citește rolul din localStorage
-    // În producție, ai valida token-ul și ai lua rolul de la API
-    const role = localStorage.getItem("userRole");
-    
-    // Simulare nume utilizator
-    let name = "Utilizator";
-    if (role === 'ELEV') name = "Ana Popescu";
-    if (role === 'PROFESOR') name = "Prof. Ionescu";
-    if (role === 'ADMIN') name = "Administrator";
-    
-    setUserRole(role);
-    setUserName(name);
-    setIsLoading(false);
-  }, []);
+    let isMounted = true;
+
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+
+    if (!token) {
+      setError("Nu sunteti autentificat. Va rugam sa va logati.");
+      setIsLoading(false);
+      router.replace("/login");
+      return;
+    }
+
+    const fetchUser = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/user/`, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Token ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Unable to load user profile");
+        }
+
+        const data: BackendUser = await response.json();
+        if (!isMounted) {
+          return;
+        }
+
+        const resolvedRole =
+          data.role ||
+          (data.groups && data.groups.length > 0 ? data.groups[0] : null);
+
+        setUserRole(resolvedRole);
+        if (resolvedRole) {
+          localStorage.setItem("userRole", resolvedRole);
+        } else {
+          localStorage.removeItem("userRole");
+        }
+
+        const computedName = `${data.first_name ?? ""} ${
+          data.last_name ?? ""
+        }`
+          .trim()
+          .replace(/\s+/g, " ");
+        const finalName =
+          computedName.length > 0 ? computedName : data.username;
+        setUserName(finalName);
+        localStorage.setItem("userName", finalName);
+        setError(null);
+      } catch (fetchError) {
+        console.error("Failed to load user profile", fetchError);
+        if (isMounted) {
+          setError("Sesiunea a expirat. Autentificati-va din nou.");
+        }
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("userRole");
+        localStorage.removeItem("userName");
+        router.replace("/login");
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
+
+  const handleLogout = async () => {
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+
+    try {
+      if (token) {
+        await fetch(`${API_BASE_URL}/logout/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Token ${token}`,
+          },
+        });
+      }
+    } catch (logoutError) {
+      console.error("Logout failed", logoutError);
+    } finally {
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("userRole");
+      localStorage.removeItem("userName");
+      router.replace("/login");
+    }
+  };
 
   const renderDashboardContent = () => {
     switch (userRole) {
@@ -922,20 +1017,15 @@ export default function DashboardPage() {
       case "ADMIN":
         return <AdminDashboard />;
       default:
-        // Dacă nu e logat sau nu are rol, poți redirecționa
-        if (typeof window !== "undefined") {
-          // window.location.href = "/login";
-        }
         return (
           <div className="text-center p-10">
             <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
-              Rol invalid sau negăsit.
+              {error ?? "Rol invalid sau negasit."}
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mt-2">
-              Vă rugăm să vă autentificați.
-            </p>
-            <p className="text-sm text-gray-500 mt-4">
-              (Testați setând 'userRole' în localStorage: "ELEV" sau "PROFESOR")
+              {error
+                ? "Veti fi redirectionat catre pagina de autentificare."
+                : "Va rugam sa va autentificati pentru a continua."}
             </p>
           </div>
         );
@@ -946,7 +1036,7 @@ export default function DashboardPage() {
     return (
       <div className="flex h-screen bg-gray-100 dark:bg-gray-950 items-center justify-center">
         <p className="text-xl text-gray-700 dark:text-gray-300">
-          Se încarcă...
+          Se incarca...
         </p>
       </div>
     );
@@ -954,7 +1044,6 @@ export default function DashboardPage() {
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-950">
-      {/* Overlay pentru meniu mobil */}
       {isSidebarOpen && (
         <div
           className="fixed inset-0 z-20 bg-black opacity-50 lg:hidden"
@@ -962,10 +1051,12 @@ export default function DashboardPage() {
         ></div>
       )}
 
-      {/* Sidebar */}
-      <Sidebar isSidebarOpen={isSidebarOpen} userRole={userRole} />
+      <Sidebar
+        isSidebarOpen={isSidebarOpen}
+        userRole={userRole}
+        onLogout={handleLogout}
+      />
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <DashboardLayout
           userRole={userRole}

@@ -1,6 +1,8 @@
-from rest_framework import serializers
 from django.contrib.auth import authenticate
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
+from rest_framework import serializers
+
+from .constants import ROLE_CHOICES
 
 
 class LoginSerializer(serializers.Serializer):
@@ -28,23 +30,42 @@ class LoginSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     groups = serializers.SerializerMethodField()
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'groups')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'groups', 'role')
         read_only_fields = ('id',)
 
     def get_groups(self, obj):
         return [group.name for group in obj.groups.all()]
 
+    def get_role(self, obj):
+        role_group = obj.groups.first()
+        if role_group:
+            return role_group.name
+        if obj.is_superuser or obj.is_staff:
+            return "ADMIN"
+        # Default fallback so legacy accounts without explicit groups keep working.
+        return "ELEV"
+
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     password2 = serializers.CharField(write_only=True, min_length=8)
+    role = serializers.ChoiceField(choices=ROLE_CHOICES, default=ROLE_CHOICES[0][0])
 
     class Meta:
         model = User
-        fields = ('username', 'email', 'password', 'password2', 'first_name', 'last_name')
+        fields = (
+            'username',
+            'email',
+            'password',
+            'password2',
+            'first_name',
+            'last_name',
+            'role',
+        )
 
     def validate(self, data):
         if data.get('password') != data.get('password2'):
@@ -53,6 +74,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('password2', None)
+        role = validated_data.pop('role', ROLE_CHOICES[0][0])
         password = validated_data.pop('password')
         username = validated_data.get('username')
         email = validated_data.get('email', '')
@@ -65,4 +87,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             first_name=first_name,
             last_name=last_name
         )
+        group, _ = Group.objects.get_or_create(name=role)
+        user.groups.set([group])
         return user

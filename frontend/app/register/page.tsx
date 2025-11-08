@@ -1,7 +1,36 @@
 "use client";
 
-import { useState, FormEvent } from "react";
-// import { useRouter } from "next/navigation"; // Lăsăm comentat, folosim window.location
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api";
+
+type RoleOption = {
+  value: string;
+  label: string;
+};
+
+const FALLBACK_ROLES: RoleOption[] = [
+  { value: "ELEV", label: "Elev" },
+  { value: "PROFESOR", label: "Profesor" },
+  { value: "ADMIN", label: "Admin" },
+];
+
+type RegisterResponse = {
+  token?: string;
+  message?: string;
+  errors?: Record<string, string[]>;
+  user?: {
+    id: number;
+    username: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    role?: string | null;
+    groups?: string[];
+  };
+};
 
 // --- Iconițe SVG pentru parola ---
 const EyeIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -45,8 +74,8 @@ const EyeOffIcon = (props: React.SVGProps<SVGSVGElement>) => (
 // --- Sfârșit Iconițe SVG ---
 
 export default function RegisterPage() {
-  const [firstName, setFirstName] = useState(""); // Câmp nou
-  const [lastName, setLastName] = useState(""); // Câmp nou
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -54,54 +83,105 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  // const router = useRouter(); // Folosim window.location.href pentru redirecționare
+  const [roles, setRoles] = useState<RoleOption[]>(FALLBACK_ROLES);
+  const [role, setRole] = useState<string>(FALLBACK_ROLES[0].value);
+  const [isRoleLoading, setIsRoleLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchRoles = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/roles/`);
+        if (!response.ok) {
+          throw new Error("Failed to load roles");
+        }
+        const data: { roles?: RoleOption[] } = await response.json();
+        if (isMounted && data.roles && data.roles.length > 0) {
+          setRoles(data.roles);
+          setRole(data.roles[0].value);
+        }
+      } catch (fetchError) {
+        console.error("Failed to fetch roles", fetchError);
+      } finally {
+        if (isMounted) {
+          setIsRoleLoading(false);
+        }
+      }
+    };
+
+    fetchRoles();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
 
-    // Verificare parolă
     if (password !== confirmPassword) {
-      setError("Parolele nu se potrivesc.");
+      setError("Passwords do not match.");
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Endpoint-ul de register (presupus)
-      const response = await fetch("http://127.0.0.1:8000/api/register/", {
+      const response = await fetch(`${API_BASE_URL}/register/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          first_name: firstName, // Am adăugat
-          last_name: lastName, // Am adăugat
+          first_name: firstName,
+          last_name: lastName,
           username,
           email,
           password,
+          password2: confirmPassword,
+          role,
         }),
       });
 
-      const data = await response.json();
+      const data: RegisterResponse = await response.json();
 
       if (response.ok) {
-        // Dacă API-ul de register returnează un token, loghează utilizatorul
         if (data.token) {
           localStorage.setItem("authToken", data.token);
         }
-        // Redirecționare standard
-        window.location.href = "/dashboard";
+        const userRole =
+          data.user?.role ||
+          (data.user?.groups && data.user.groups.length > 0
+            ? data.user.groups[0]
+            : role);
+        if (userRole) {
+          localStorage.setItem("userRole", userRole);
+        }
+        if (data.user) {
+          const fullName = `${data.user.first_name ?? ""} ${
+            data.user.last_name ?? ""
+          }`
+            .trim()
+            .replace(/\s+/g, " ");
+          localStorage.setItem(
+            "userName",
+            fullName.length > 0 ? fullName : data.user.username
+          );
+        }
+        router.push("/dashboard");
       } else {
-        // Afișează eroarea din backend (de ex. "Username already exists")
-        let errorMessage = "Registration failed. Please try again.";
-        if (data.message) {
-          errorMessage = data.message;
-        } else if (data.username) {
-          errorMessage = `Username: ${data.username[0]}`; // Exemplu de eroare specifică Django REST
-        } else if (data.email) {
-          errorMessage = `Email: ${data.email[0]}`;
+        let errorMessage =
+          data.message || "Registration failed. Please try again.";
+        if (data.errors) {
+          for (const messages of Object.values(data.errors)) {
+            if (messages && messages.length > 0) {
+              errorMessage = messages[0];
+              break;
+            }
+          }
         }
         setError(errorMessage);
       }
@@ -223,6 +303,37 @@ export default function RegisterPage() {
                   placeholder="name@example.com"
                 />
               </div>
+            </div>
+
+
+            <div>
+              <label
+                htmlFor="role"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Role
+              </label>
+              <div className="mt-1">
+                <select
+                  id="role"
+                  name="role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  disabled={isRoleLoading || roles.length === 0}
+                  className="block w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:opacity-60"
+                >
+                  {roles.map((roleOption) => (
+                    <option key={roleOption.value} value={roleOption.value}>
+                      {roleOption.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {isRoleLoading && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Loading roles...
+                </p>
+              )}
             </div>
 
             {/* Câmpul Password */}
