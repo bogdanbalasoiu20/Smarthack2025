@@ -3,3 +3,6 @@ djangorestframework
 channels
 channels-redis
 mysql-connector-python
+daphne
+redis
+django-cors-headers
