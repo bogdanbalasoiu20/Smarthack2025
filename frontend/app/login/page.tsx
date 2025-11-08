@@ -4,40 +4,30 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 // --- Iconițe SVG ---
-// Am folosit SVG-uri inline pentru a nu fi nevoie să instalezi pachete noi de iconițe
-const UserIcon = (props: React.SVGProps<SVGSVGElement>) => (
+// Am înlocuit UserIcon și LockIcon cu variantele SVG de la FontAwesome,
+// conform solicitării tale.
+
+const CircleUserIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
+    viewBox="0 0 512 512"
+    fill="currentColor" // FontAwesome folosește 'fill' în loc de 'stroke' pentru aceste iconițe
     {...props}
   >
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
+    {/* path pentru fa-circle-user */}
+    <path d="M399 384.2C376.9 345.8 335.4 320 288 320H224c-47.4 0-88.9 25.8-111 64.2c35.2 39.2 86.2 63.8 143 63.8s107.8-24.7 143-63.8zM0 256a256 256 0 1 1 512 0A256 256 0 1 1 0 256zm256 16a72 72 0 1 0 0-144 72 72 0 1 0 0 144z" />
   </svg>
 );
 
-const LockIcon = (props: React.SVGProps<SVGSVGElement>) => (
+const KeyIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
+    viewBox="0 0 512 512"
+    fill="currentColor"
     {...props}
   >
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    {/* path pentru fa-key */}
+    <path d="M336 352c97.2 0 176-78.8 176-176S433.2 0 336 0S160 78.8 160 176c0 18.7 2.9 36.8 8.3 53.7L7 391c-4.5 4.5-7 10.6-7 17v80c0 13.3 10.7 24 24 24h80c13.3 0 24-10.7 24-24V432c0-6.4 2.5-12.5 7-17l199.7-199.7c16.9 5.4 35 8.3 53.7 8.3zM376 176c-26.5 0-48-21.5-48-48s21.5-48 48-48s48 21.5 48 48s-21.5 48-48 48z" />
   </svg>
 );
 
@@ -174,7 +164,8 @@ export default function LoginPage() {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <UserIcon className="h-5 w-5 text-gray-400" />
+                  {/* --- ICONIȚĂ MODIFICATĂ --- */}
+                  <CircleUserIcon className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   id="username"
@@ -199,7 +190,8 @@ export default function LoginPage() {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <LockIcon className="h-5 w-5 text-gray-400" />
+                  {/* --- ICONIȚĂ MODIFICATĂ --- */}
+                  <KeyIcon className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   id="password"
