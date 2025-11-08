@@ -34,7 +34,14 @@ export default function Toolbar() {
   };
 
   const addTextElement = () => {
-    if (!selectedFrame || !canEdit) return;
+    if (!selectedFrame || !canEdit) {
+      console.warn('Cannot add text: no frame selected or no edit permission');
+      alert('Please select a frame first and ensure you have edit permissions');
+      return;
+    }
+
+    console.log('Adding text element to frame:', selectedFrame.id);
+
     createElement(selectedFrame.id, {
       element_type: 'TEXT',
       position: JSON.stringify({
@@ -52,11 +59,23 @@ export default function Toolbar() {
         color: '#000000',
         align: 'left',
       }),
+    }).then(() => {
+      console.log('Text element added successfully');
+    }).catch(err => {
+      console.error('Failed to add text element:', err);
+      alert('Failed to add text element. Check console for details.');
     });
   };
 
   const addShape = (shape: 'rectangle' | 'circle') => {
-    if (!selectedFrame || !canEdit) return;
+    if (!selectedFrame || !canEdit) {
+      console.warn('Cannot add shape: no frame selected or no edit permission');
+      alert('Please select a frame first and ensure you have edit permissions');
+      return;
+    }
+
+    console.log(`Adding ${shape} to frame:`, selectedFrame.id);
+
     createElement(selectedFrame.id, {
       element_type: 'SHAPE',
       position: JSON.stringify({
@@ -73,6 +92,11 @@ export default function Toolbar() {
         stroke: '#1e40af',
         strokeWidth: 2,
       }),
+    }).then(() => {
+      console.log(`${shape} added successfully`);
+    }).catch(err => {
+      console.error(`Failed to add ${shape}:`, err);
+      alert(`Failed to add ${shape}. Check console for details.`);
     });
   };
 
