@@ -34,8 +34,8 @@ export default function LoginPage() {
         if (data.token) {
           localStorage.setItem("authToken", data.token);
         }
-        // Redirect to home page or dashboard
-        router.push("/");
+        // Redirect to dashboard
+        router.push("/dashboard");
       } else {
         setError(data.message || "Login failed. Please try again.");
       }
