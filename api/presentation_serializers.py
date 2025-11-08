@@ -49,8 +49,16 @@ class BrandKitSerializer(serializers.ModelSerializer):
             return []
 
     def create(self, validated_data):
+        from django.utils import timezone
         validated_data['created_by'] = self.context['request'].user
+        validated_data['created_at'] = timezone.now()
+        validated_data['updated_at'] = timezone.now()
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        from django.utils import timezone
+        validated_data['updated_at'] = timezone.now()
+        return super().update(instance, validated_data)
 
 
 # ===== ASSET =====
@@ -70,7 +78,9 @@ class AssetSerializer(serializers.ModelSerializer):
             return []
 
     def create(self, validated_data):
+        from django.utils import timezone
         validated_data['uploaded_by'] = self.context['request'].user
+        validated_data['created_at'] = timezone.now()
         return super().create(validated_data)
 
 
@@ -91,8 +101,10 @@ class PresentationTemplateSerializer(serializers.ModelSerializer):
             return {}
 
     def create(self, validated_data):
+        from django.utils import timezone
         if 'created_by' not in validated_data:
             validated_data['created_by'] = self.context['request'].user
+        validated_data['created_at'] = timezone.now()
         return super().create(validated_data)
 
 
@@ -117,6 +129,19 @@ class ElementSerializer(serializers.ModelSerializer):
             return json.loads(obj.content)
         except:
             return {}
+
+    def create(self, validated_data):
+        from django.utils import timezone
+        # Set timestamps manually since managed=False doesn't auto-populate them
+        validated_data['created_at'] = timezone.now()
+        validated_data['updated_at'] = timezone.now()
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        from django.utils import timezone
+        # Update the timestamp manually
+        validated_data['updated_at'] = timezone.now()
+        return super().update(instance, validated_data)
 
 
 # ===== FRAME CONNECTION =====
@@ -143,6 +168,17 @@ class FrameSerializer(serializers.ModelSerializer):
             return json.loads(obj.position)
         except:
             return {"x": 0, "y": 0, "width": 1920, "height": 1080, "rotation": 0}
+
+    def create(self, validated_data):
+        from django.utils import timezone
+        validated_data['created_at'] = timezone.now()
+        validated_data['updated_at'] = timezone.now()
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        from django.utils import timezone
+        validated_data['updated_at'] = timezone.now()
+        return super().update(instance, validated_data)
 
 
 class FrameMinimalSerializer(serializers.ModelSerializer):
@@ -181,8 +217,16 @@ class CommentSerializer(serializers.ModelSerializer):
         return None
 
     def create(self, validated_data):
+        from django.utils import timezone
         validated_data['author'] = self.context['request'].user
+        validated_data['created_at'] = timezone.now()
+        validated_data['updated_at'] = timezone.now()
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        from django.utils import timezone
+        validated_data['updated_at'] = timezone.now()
+        return super().update(instance, validated_data)
 
 
 # ===== PRESENTATION ACCESS =====
@@ -197,9 +241,11 @@ class PresentationAccessSerializer(serializers.ModelSerializer):
         read_only_fields = ('granted_at', 'granted_by', 'user')
 
     def create(self, validated_data):
+        from django.utils import timezone
         validated_data['granted_by'] = self.context['request'].user
         user_id = validated_data.pop('user_id')
         validated_data['user'] = User.objects.get(id=user_id)
+        validated_data['granted_at'] = timezone.now()
         return super().create(validated_data)
 
 
@@ -250,8 +296,16 @@ class PresentationSerializer(serializers.ModelSerializer):
         return access.permission if access else None
 
     def create(self, validated_data):
+        from django.utils import timezone
         validated_data['owner'] = self.context['request'].user
+        validated_data['created_at'] = timezone.now()
+        validated_data['updated_at'] = timezone.now()
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        from django.utils import timezone
+        validated_data['updated_at'] = timezone.now()
+        return super().update(instance, validated_data)
 
 
 class PresentationMinimalSerializer(serializers.ModelSerializer):
@@ -298,7 +352,9 @@ class PresentationVersionSerializer(serializers.ModelSerializer):
             return {}
 
     def create(self, validated_data):
+        from django.utils import timezone
         validated_data['created_by'] = self.context['request'].user
+        validated_data['created_at'] = timezone.now()
         return super().create(validated_data)
 
 
@@ -319,5 +375,7 @@ class RecordingSerializer(serializers.ModelSerializer):
             return {}
 
     def create(self, validated_data):
+        from django.utils import timezone
         validated_data['created_by'] = self.context['request'].user
+        validated_data['created_at'] = timezone.now()
         return super().create(validated_data)
