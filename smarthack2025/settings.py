@@ -92,7 +92,7 @@ WSGI_APPLICATION = 'smarthack2025.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
+        'ENGINE': 'mysql.connector.django',
         'NAME': 'smarthack2025',
         'USER': 'django_user',
         'PASSWORD': 'django_pass',
