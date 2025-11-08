@@ -59,6 +59,7 @@ export default function Toolbar() {
         color: '#000000',
         align: 'left',
       }),
+      link_url: '',
     }).then(() => {
       console.log('Text element added successfully');
     }).catch(err => {
@@ -92,6 +93,7 @@ export default function Toolbar() {
         stroke: '#1e40af',
         strokeWidth: 2,
       }),
+      link_url: '',
     }).then(() => {
       console.log(`${shape} added successfully`);
     }).catch(err => {

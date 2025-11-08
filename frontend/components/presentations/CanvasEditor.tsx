@@ -302,19 +302,20 @@ export default function CanvasEditor() {
     if (assetData) {
       try {
         const asset = JSON.parse(assetData);
-        await createElement({
+        await createElement(selectedFrame.id, {
           element_type: asset.asset_type === 'IMAGE' ? 'IMAGE' : 'VIDEO',
-          position: {
+          position: JSON.stringify({
             x: Math.max(0, dropX),
             y: Math.max(0, dropY),
             width: 300,
             height: 200,
             rotation: 0,
             z_index: 1,
-          },
-          content: {
+          }),
+          content: JSON.stringify({
             url: asset.file_url,
-          },
+          }),
+          link_url: '',
         });
       } catch (err) {
         console.error('Failed to parse asset data:', err);
@@ -324,19 +325,20 @@ export default function CanvasEditor() {
 
     // Handle image URL from external source
     if (imageUrl) {
-      await createElement({
+      await createElement(selectedFrame.id, {
         element_type: 'IMAGE',
-        position: {
+        position: JSON.stringify({
           x: Math.max(0, dropX),
           y: Math.max(0, dropY),
           width: 300,
           height: 200,
           rotation: 0,
           z_index: 1,
-        },
-        content: {
+        }),
+        content: JSON.stringify({
           url: imageUrl,
-        },
+        }),
+        link_url: '',
       });
       return;
     }
@@ -348,21 +350,22 @@ export default function CanvasEditor() {
           // Create a temporary URL for the image
           const objectUrl = URL.createObjectURL(file);
 
-          await createElement({
+          await createElement(selectedFrame.id, {
             element_type: 'IMAGE',
-            position: {
+            position: JSON.stringify({
               x: Math.max(0, dropX),
               y: Math.max(0, dropY),
               width: 300,
               height: 200,
               rotation: 0,
               z_index: 1,
-            },
-            content: {
+            }),
+            content: JSON.stringify({
               url: objectUrl,
               fileName: file.name,
               // TODO: Upload file to server and update URL
-            },
+            }),
+            link_url: '',
           });
         }
       }
