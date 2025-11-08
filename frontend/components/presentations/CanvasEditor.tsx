@@ -38,6 +38,9 @@ const HANDLE_STYLE_MAP: Record<ResizeHandle, CSSProperties> = {
 };
 
 const clampSize = (value: number) => Math.max(MIN_ELEMENT_SIZE, value);
+const GRID_PATTERN =
+  'linear-gradient(0deg, rgba(148,163,184,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.08) 1px, transparent 1px)';
+const GRID_SIZE = 32;
 
 const getResizedPosition = (
   handle: ResizeHandle,
@@ -374,8 +377,8 @@ export default function CanvasEditor() {
 
   if (!selectedFrame) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-gray-500">
-        Selectează un cadru pentru a edita
+      <div className="w-full h-full flex items-center justify-center text-gray-400">
+        Select a frame from the sidebar to start editing
       </div>
     );
   }
@@ -383,46 +386,60 @@ export default function CanvasEditor() {
   const framePos = selectedFrame.position_parsed;
 
   return (
-    <div
-      ref={canvasRef}
-      className={`w-full h-full overflow-hidden bg-gray-200 relative cursor-move ${
-        isDragOver ? 'ring-4 ring-blue-400 ring-inset' : ''
-      }`}
-      onWheel={handleWheel}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      {/* Canvas transformabil */}
+    <div className="relative h-full w-full">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.2),_transparent_45%),radial-gradient(circle_at_bottom,_rgba(14,165,233,0.15),_transparent_45%)]" />
       <div
+        ref={canvasRef}
+        className="relative h-full w-full overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/60 shadow-[0_40px_120px_rgba(2,6,23,0.65)] backdrop-blur-2xl"
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          transformOrigin: '0 0',
-          position: 'absolute',
-          left: 0,
-          top: 0,
+          boxShadow: isDragOver
+            ? '0 0 0 2px rgba(99,102,241,0.45), 0 35px 90px rgba(2,6,23,0.65)'
+            : '0 35px 90px rgba(2,6,23,0.55)',
         }}
       >
-        {/* Frame vizibil */}
         <div
-          className="shadow-lg relative"
+          className="absolute inset-3 rounded-3xl border border-white/5 bg-slate-900/50 shadow-inner"
           style={{
-            width: `${framePos.width}px`,
-            height: `${framePos.height}px`,
-            backgroundColor: selectedFrame.background_color,
-            backgroundImage: selectedFrame.background_image
-              ? `url(${selectedFrame.background_image})`
-              : undefined,
-            backgroundSize: 'cover',
-            transform: `rotate(${framePos.rotation}deg)`,
+            backgroundImage: GRID_PATTERN,
+            backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+          }}
+        />
+
+        <div
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: '0 0',
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            cursor: isPanning ? 'grabbing' : isDragging ? 'grabbing' : 'default',
           }}
         >
-          {/* Elemente în frame */}
-          {selectedFrame.elements?.map((element) => {
+          <div
+            className="relative shadow-[0_30px_60px_rgba(2,6,23,0.45)]"
+            style={{
+              width: `${framePos.width}px`,
+              height: `${framePos.height}px`,
+              backgroundColor: selectedFrame.background_color,
+              backgroundImage: selectedFrame.background_image
+                ? `url(${selectedFrame.background_image})`
+                : undefined,
+              backgroundSize: 'cover',
+              transform: `rotate(${framePos.rotation}deg)`,
+              borderRadius: '32px',
+              border: '1px solid rgba(255,255,255,0.08)',
+              overflow: 'hidden',
+            }}
+          >
+            {selectedFrame.elements?.map((element) => {
             const elPos = element.position_parsed;
             const content = element.content_parsed;
 
@@ -468,33 +485,42 @@ export default function CanvasEditor() {
               </motion.div>
             );
           })}
+          </div>
         </div>
-      </div>
 
-      {/* Zoom controls */}
-      <div className="absolute bottom-4 right-4 bg-white rounded-lg shadow-lg p-2 flex gap-2">
-        <button
-          onClick={() => setZoom((z) => Math.max(z - 0.1, 0.1))}
-          className="px-3 py-1 hover:bg-gray-100 rounded"
-        >
-          -
-        </button>
-        <span className="px-3 py-1">{Math.round(zoom * 100)}%</span>
-        <button
-          onClick={() => setZoom((z) => Math.min(z + 0.1, 5))}
-          className="px-3 py-1 hover:bg-gray-100 rounded"
-        >
-          +
-        </button>
-        <button
-          onClick={() => {
-            setZoom(1);
-            setPan({ x: 0, y: 0 });
-          }}
-          className="px-3 py-1 hover:bg-gray-100 rounded ml-2"
-        >
-          Reset
-        </button>
+        {isDragOver && (
+          <div className="pointer-events-none absolute inset-6 rounded-[26px] border-2 border-dashed border-indigo-400/80 bg-indigo-500/10" />
+        )}
+
+        <div className="absolute inset-x-8 bottom-6 flex items-center justify-center">
+          <div className="flex items-center gap-3 rounded-full border border-white/10 bg-slate-900/70 px-4 py-2 text-white/80 shadow-2xl backdrop-blur">
+            <button
+              onClick={() => setZoom((z) => Math.max(z - 0.1, 0.1))}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg font-semibold text-white transition hover:bg-white/30"
+            >
+              –
+            </button>
+            <span className="min-w-[4rem] text-center font-semibold tracking-wide">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              onClick={() => setZoom((z) => Math.min(z + 0.1, 5))}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg font-semibold text-white transition hover:bg-white/30"
+            >
+              +
+            </button>
+            <div className="h-6 w-px bg-white/20" />
+            <button
+              onClick={() => {
+                setZoom(1);
+                setPan({ x: 0, y: 0 });
+              }}
+              className="rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-lg shadow-indigo-500/40 transition hover:shadow-indigo-500/60"
+            >
+              Reset view
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

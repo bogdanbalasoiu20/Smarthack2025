@@ -17,23 +17,32 @@ export default function PresentationEditorPage() {
 
   return (
     <PresentationProvider presentationId={presentationId}>
-      <div className="h-screen flex flex-col bg-gray-100">
-        {/* Toolbar sus */}
-        <Toolbar />
+      <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-50">
+        <div className="pointer-events-none absolute inset-0 opacity-70">
+          <div className="absolute -left-20 top-10 h-96 w-96 rounded-full bg-purple-500/30 blur-3xl" />
+          <div className="absolute right-0 top-32 h-[36rem] w-[36rem] rounded-full bg-blue-500/20 blur-[120px]" />
+          <div className="absolute bottom-[-10%] left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-indigo-600/20 blur-[120px]" />
+        </div>
 
-        {/* Zona principală */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Sidebar stânga - Frames */}
-          <FramesSidebar />
+        <div className="relative z-10 flex min-h-screen flex-col gap-6 p-6">
+          <Toolbar />
 
-          {/* Canvas central */}
-          <div className="flex-1 relative">
-            <CanvasEditor />
-          </div>
+          <div className="flex flex-1 gap-6 overflow-hidden">
+            <div className="w-[18rem] flex-shrink-0">
+              <FramesSidebar />
+            </div>
 
-          {/* Panel dreapta - Assets / AI / Comments (tabbed) */}
-          <div className="w-80 bg-white border-l border-gray-200 flex flex-col">
-            <RightPanel />
+            <div className="flex-1">
+              <div className="h-full rounded-[32px] border border-white/10 bg-white/5 p-1 backdrop-blur-2xl shadow-[0_25px_120px_rgba(3,7,18,0.55)]">
+                <CanvasEditor />
+              </div>
+            </div>
+
+            <div className="w-[22rem] flex-shrink-0">
+              <div className="h-full rounded-[32px] border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[0_25px_120px_rgba(3,7,18,0.55)]">
+                <RightPanel />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -48,40 +57,40 @@ function RightPanel() {
     <div className="flex h-full flex-col">
       <ElementInspector />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <div className="flex border-y border-gray-200 bg-white">
+        <div className="mx-4 mt-4 flex rounded-2xl border border-white/10 bg-white/5 p-1 text-xs font-semibold tracking-wide text-slate-300 backdrop-blur">
           <button
             onClick={() => setActiveTab('assets')}
-            className={`flex-1 px-4 py-3 text-sm font-medium ${
+            className={`flex-1 rounded-2xl px-4 py-2 transition ${
               activeTab === 'assets'
-                ? 'border-b-2 border-blue-600 text-blue-600'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-gradient-to-r from-indigo-500/70 to-purple-500/70 text-white shadow-lg shadow-indigo-500/20'
+                : 'text-slate-300 hover:text-white'
             }`}
           >
             Assets
           </button>
           <button
             onClick={() => setActiveTab('ai')}
-            className={`flex-1 px-4 py-3 text-sm font-medium ${
+            className={`flex-1 rounded-2xl px-4 py-2 transition ${
               activeTab === 'ai'
-                ? 'border-b-2 border-blue-600 text-blue-600'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-gradient-to-r from-indigo-500/70 to-purple-500/70 text-white shadow-lg shadow-indigo-500/20'
+                : 'text-slate-300 hover:text-white'
             }`}
           >
             AI
           </button>
           <button
             onClick={() => setActiveTab('comments')}
-            className={`flex-1 px-4 py-3 text-sm font-medium ${
+            className={`flex-1 rounded-2xl px-4 py-2 transition ${
               activeTab === 'comments'
-                ? 'border-b-2 border-blue-600 text-blue-600'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-gradient-to-r from-indigo-500/70 to-purple-500/70 text-white shadow-lg shadow-indigo-500/20'
+                : 'text-slate-300 hover:text-white'
             }`}
           >
             Comments
           </button>
         </div>
 
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden px-4 pb-4">
           {activeTab === 'assets' && <AssetsPanel />}
           {activeTab === 'ai' && <AIPanel />}
           {activeTab === 'comments' && <CommentsPanel />}
