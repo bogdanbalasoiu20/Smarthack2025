@@ -120,7 +120,11 @@ const MOCK_COURSE_DATABASE = {
 };
 
 // --- NOU: Componenta Buton pentru Materiale (Pentru Elevi) ---
-const StudentMaterialButton = ({ material }) => {
+type StudentMaterialButtonProps = {
+  material: CourseMaterial;
+};
+
+const StudentMaterialButton = ({ material }: StudentMaterialButtonProps) => {
   const isKahoot = material.type === "kahoot";
 
   // --- LOGICA PENTRU REDIRECȚIONARE ---
