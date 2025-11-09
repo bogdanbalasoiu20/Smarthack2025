@@ -21,7 +21,7 @@ from .presentation_serializers import (
     PresentationSerializer, PresentationMinimalSerializer, PresentationAccessSerializer,
     FrameSerializer, FrameMinimalSerializer, FrameConnectionSerializer,
     ElementSerializer, CommentSerializer, PresentationVersionSerializer,
-    RecordingSerializer
+    RecordingSerializer, UserMinimalSerializer
 )
 
 
@@ -296,6 +296,77 @@ class PresentationViewSet(viewsets.ModelViewSet):
 
         version_serializer = PresentationVersionSerializer(version)
         return Response(version_serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['get', 'post', 'delete'], permission_classes=[IsAuthenticated], url_path='collaborators')
+    def collaborators(self, request, pk=None):
+        """List/modify collaborators for a presentation"""
+        presentation = self.get_object()
+
+        if request.method == 'GET':
+            serializer = PresentationAccessSerializer(
+                presentation.access_grants.select_related('user', 'granted_by'),
+                many=True,
+                context={'request': request}
+            )
+            owner_payload = UserMinimalSerializer(presentation.owner).data
+            return Response({
+                'owner': owner_payload,
+                'collaborators': serializer.data
+            })
+
+        if presentation.owner != request.user:
+            return Response({'error': 'Only the owner can manage collaborators'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        if request.method == 'POST':
+            email = (request.data.get('email') or '').strip()
+            permission = (request.data.get('permission') or 'VIEWER').upper()
+            if permission not in ['VIEWER', 'EDITOR']:
+                permission = 'VIEWER'
+
+            if not email:
+                return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            user = User.objects.filter(
+                Q(email__iexact=email) | Q(username__iexact=email)
+            ).first()
+
+            if not user:
+                return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            if user == presentation.owner:
+                return Response({'error': 'Owner already has full access'}, status=status.HTTP_400_BAD_REQUEST)
+
+            access, created = PresentationAccess.objects.update_or_create(
+                presentation=presentation,
+                user=user,
+                defaults={
+                    'permission': permission,
+                    'granted_by': request.user,
+                    'granted_at': timezone.now(),
+                }
+            )
+
+            serializer = PresentationAccessSerializer(access, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+        # DELETE
+        access_id = request.data.get('access_id')
+        user_id = request.data.get('user_id')
+
+        qs = PresentationAccess.objects.filter(presentation=presentation)
+        if access_id:
+            qs = qs.filter(id=access_id)
+        elif user_id:
+            qs = qs.filter(user_id=user_id)
+        else:
+            return Response({'error': 'access_id or user_id required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        deleted, _ = qs.delete()
+        if not deleted:
+            return Response({'error': 'Collaborator not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # ===== PRESENTATION ACCESS =====

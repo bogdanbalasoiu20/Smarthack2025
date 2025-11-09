@@ -19,9 +19,40 @@ const ALIGN_OPTIONS = [
   { icon: AlignRight, value: 'right', label: 'Align right' },
 ];
 
+const ANIMATION_TYPES = [
+  { value: 'fade', label: 'Fade' },
+  { value: 'slide', label: 'Slide' },
+  { value: 'zoom', label: 'Zoom' },
+  { value: 'bounce', label: 'Bounce' },
+];
+
+const DIRECTION_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  fade: [{ value: 'none', label: 'None' }],
+  zoom: [{ value: 'none', label: 'None' }],
+  bounce: [{ value: 'none', label: 'None' }],
+  slide: [
+    { value: 'up', label: 'Up' },
+    { value: 'down', label: 'Down' },
+    { value: 'left', label: 'Left' },
+    { value: 'right', label: 'Right' },
+  ],
+};
+
+const DEFAULT_ANIMATION_SETTINGS = {
+  type: 'fade',
+  direction: 'up',
+  duration: 0.8,
+  delay: 0,
+  easing: 'easeInOut',
+};
+
 export default function ElementInspector() {
   const { selectedElement, updateElement, deleteElement, canEdit } = usePresentation();
   const [textDraft, setTextDraft] = useState('');
+  const animationSettings = {
+    ...DEFAULT_ANIMATION_SETTINGS,
+    ...(selectedElement?.animation_settings_parsed || {}),
+  };
 
   useEffect(() => {
     if (selectedElement?.element_type === 'TEXT') {
@@ -92,6 +123,17 @@ export default function ElementInspector() {
     if (result.isConfirmed) {
       deleteElement(selectedElement.id);
     }
+  };
+
+  const handleAnimationChange = (patch: Partial<typeof animationSettings>) => {
+    if (!canEdit || !selectedElement) return;
+    let next = { ...animationSettings, ...patch };
+    if (patch.type && patch.type !== 'slide') {
+      next = { ...next, direction: 'none' };
+    }
+    updateElement(selectedElement.id, {
+      animation_settings: JSON.stringify(next),
+    });
   };
 
   const baseInput = `mt-1 w-full rounded-lg border px-2 py-1 text-sm text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${controlsDisabled ? 'cursor-not-allowed border-white/5 bg-white/5 text-white/30' : 'border-white/10 bg-white/5'}`;
@@ -291,6 +333,94 @@ export default function ElementInspector() {
           </div>
         </section>
       )}
+
+      <section className="space-y-3 border-t border-white/5 px-4 pb-4 pt-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/40">
+          Animation
+        </p>
+        <label className="text-xs text-white/70">
+          Type
+          <select
+            value={animationSettings.type}
+            disabled={controlsDisabled}
+            onChange={(e) => handleAnimationChange({ type: e.target.value })}
+            className={`mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${
+              controlsDisabled ? 'opacity-50' : ''
+            }`}
+          >
+            {ANIMATION_TYPES.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {animationSettings.type === 'slide' && (
+          <label className="text-xs text-white/70">
+            Direction
+            <select
+              value={animationSettings.direction}
+              disabled={controlsDisabled}
+              onChange={(e) => handleAnimationChange({ direction: e.target.value })}
+              className={`mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${
+                controlsDisabled ? 'opacity-50' : ''
+              }`}
+            >
+              {DIRECTION_OPTIONS.slide.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        <label className="text-xs text-white/70">
+          Duration ({animationSettings.duration.toFixed(1)}s)
+          <input
+            type="range"
+            min={0.2}
+            max={2}
+            step={0.1}
+            disabled={controlsDisabled}
+            value={animationSettings.duration}
+            onChange={(e) => handleAnimationChange({ duration: parseFloat(e.target.value) })}
+            className="mt-1 w-full accent-indigo-400"
+          />
+        </label>
+
+        <label className="text-xs text-white/70">
+          Delay ({animationSettings.delay.toFixed(1)}s)
+          <input
+            type="range"
+            min={0}
+            max={2}
+            step={0.1}
+            disabled={controlsDisabled}
+            value={animationSettings.delay}
+            onChange={(e) => handleAnimationChange({ delay: parseFloat(e.target.value) })}
+            className="mt-1 w-full accent-indigo-400"
+          />
+        </label>
+
+        <label className="text-xs text-white/70">
+          Easing
+          <select
+            value={animationSettings.easing}
+            disabled={controlsDisabled}
+            onChange={(e) => handleAnimationChange({ easing: e.target.value })}
+            className={`mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${
+              controlsDisabled ? 'opacity-50' : ''
+            }`}
+          >
+            <option value="easeInOut">Ease In-Out</option>
+            <option value="easeOut">Ease Out</option>
+            <option value="easeIn">Ease In</option>
+            <option value="linear">Linear</option>
+          </select>
+        </label>
+      </section>
     </div>
   );
 }

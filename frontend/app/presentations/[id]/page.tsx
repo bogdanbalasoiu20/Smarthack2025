@@ -9,11 +9,14 @@ import AIPanel from '@/components/presentations/AIPanel';
 import CommentsPanel from '@/components/presentations/CommentsPanel';
 import Toolbar from '@/components/presentations/Toolbar';
 import ElementInspector from '@/components/presentations/ElementInspector';
+import FrameInspector from '@/components/presentations/FrameInspector';
+import ShareDialog from '@/components/presentations/ShareDialog';
 import { PresentationProvider } from '@/contexts/PresentationContext';
 
 export default function PresentationEditorPage() {
   const params = useParams();
   const presentationId = params.id as string;
+  const [shareOpen, setShareOpen] = useState(false);
 
   return (
     <PresentationProvider presentationId={presentationId}>
@@ -25,7 +28,7 @@ export default function PresentationEditorPage() {
         </div>
 
         <div className="relative z-10 flex min-h-screen flex-col gap-6 p-6">
-          <Toolbar />
+          <Toolbar onOpenShare={() => setShareOpen(true)} />
 
           <div className="flex flex-1 gap-6 overflow-hidden">
             <div className="w-[18rem] flex-shrink-0">
@@ -45,6 +48,7 @@ export default function PresentationEditorPage() {
             </div>
           </div>
         </div>
+        <ShareDialog open={shareOpen} onClose={() => setShareOpen(false)} />
       </div>
     </PresentationProvider>
   );
@@ -56,6 +60,7 @@ function RightPanel() {
   return (
     <div className="flex h-full flex-col">
       <ElementInspector />
+      <FrameInspector />
       <div className="flex flex-col flex-1 overflow-hidden">
         <div className="mx-4 mt-4 flex rounded-2xl border border-white/10 bg-white/5 p-1 text-xs font-semibold tracking-wide text-slate-300 backdrop-blur">
           <button

@@ -15,6 +15,7 @@ export default function FramesSidebar() {
     createFrame,
     deleteFrame,
     canEdit,
+    announceSelection,
   } = usePresentation();
 
   const handleCreateFrame = () => {
@@ -57,9 +58,21 @@ export default function FramesSidebar() {
         {presentation?.frames.map((frame, index) => {
           const isActive = selectedFrame?.id === frame.id;
           return (
-            <button
+            <div
               key={frame.id}
-              onClick={() => setSelectedFrame(frame)}
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                setSelectedFrame(frame);
+                announceSelection(frame.id, null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedFrame(frame);
+                  announceSelection(frame.id, null);
+                }
+              }}
               className={`${cardBase} w-full cursor-pointer p-3 text-left transition ${
                 isActive
                   ? 'border-indigo-400/60 bg-indigo-500/20 shadow-lg shadow-indigo-500/20'
@@ -112,7 +125,7 @@ export default function FramesSidebar() {
               <div className="mt-2 text-xs text-slate-400">
                 {frame.elements?.length || 0} elements
               </div>
-            </button>
+            </div>
           );
         })}
 

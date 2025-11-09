@@ -47,7 +47,7 @@ export default function AssetsPanel() {
   const handleAssetClick = (asset: Asset) => {
     if (!selectedFrame || !canEdit || isDraggingCard) return;
 
-    // Adaugă asset ca element în frame
+    // Add the asset to the selected frame immediately
     createElement(selectedFrame.id, {
       element_type: asset.asset_type === 'IMAGE' ? 'IMAGE' : 'IMAGE',
       position: JSON.stringify({

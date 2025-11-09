@@ -25,6 +25,19 @@ DEFAULT_FRAME_POSITION = {
     "height": 1080,
     "rotation": 0,
 }
+DEFAULT_FRAME_TRANSITION = {
+    "type": "fade",
+    "duration": 0.8,
+    "delay": 0,
+    "direction": "none",
+}
+DEFAULT_ELEMENT_ANIMATION = {
+    "type": "fade",
+    "direction": "up",
+    "duration": 0.8,
+    "delay": 0,
+    "easing": "easeInOut",
+}
 
 
 # ===== USER SERIALIZER (minimal) =====
@@ -129,6 +142,7 @@ class PresentationTemplateSerializer(serializers.ModelSerializer):
 class ElementSerializer(serializers.ModelSerializer):
     position_parsed = serializers.SerializerMethodField()
     content_parsed = serializers.SerializerMethodField()
+    animation_settings_parsed = serializers.SerializerMethodField()
 
     class Meta:
         model = Element
@@ -147,16 +161,29 @@ class ElementSerializer(serializers.ModelSerializer):
         except:
             return {}
 
+    def get_animation_settings_parsed(self, obj):
+        try:
+            return json.loads(obj.animation_settings) if obj.animation_settings else DEFAULT_ELEMENT_ANIMATION
+        except:
+            return DEFAULT_ELEMENT_ANIMATION
+
     def create(self, validated_data):
         from django.utils import timezone
-        # Set timestamps manually since managed=False doesn't auto-populate them
+        animation_settings = validated_data.get('animation_settings')
+        if isinstance(animation_settings, dict):
+            validated_data['animation_settings'] = json.dumps(animation_settings)
+        elif not animation_settings:
+            validated_data['animation_settings'] = json.dumps(DEFAULT_ELEMENT_ANIMATION)
+
         validated_data['created_at'] = timezone.now()
         validated_data['updated_at'] = timezone.now()
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
         from django.utils import timezone
-        # Update the timestamp manually
+        animation_settings = validated_data.get('animation_settings')
+        if isinstance(animation_settings, dict):
+            validated_data['animation_settings'] = json.dumps(animation_settings)
         validated_data['updated_at'] = timezone.now()
         return super().update(instance, validated_data)
 
@@ -174,6 +201,7 @@ class FrameSerializer(serializers.ModelSerializer):
     connections_from = FrameConnectionSerializer(many=True, read_only=True)
     connections_to = FrameConnectionSerializer(many=True, read_only=True)
     position_parsed = serializers.SerializerMethodField()
+    transition_settings_parsed = serializers.SerializerMethodField()
 
     class Meta:
         model = Frame
@@ -193,6 +221,12 @@ class FrameSerializer(serializers.ModelSerializer):
             return json.loads(obj.position)
         except:
             return {"x": 0, "y": 0, "width": 1920, "height": 1080, "rotation": 0}
+
+    def get_transition_settings_parsed(self, obj):
+        try:
+            return json.loads(obj.transition_settings) if obj.transition_settings else DEFAULT_FRAME_TRANSITION
+        except:
+            return DEFAULT_FRAME_TRANSITION
 
     def create(self, validated_data):
         from django.utils import timezone
@@ -223,6 +257,12 @@ class FrameSerializer(serializers.ModelSerializer):
             else:
                 validated_data['order'] = 0
 
+        transition_settings = validated_data.get('transition_settings')
+        if isinstance(transition_settings, dict):
+            validated_data['transition_settings'] = json.dumps(transition_settings)
+        elif not transition_settings:
+            validated_data['transition_settings'] = json.dumps(DEFAULT_FRAME_TRANSITION)
+
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
@@ -231,6 +271,9 @@ class FrameSerializer(serializers.ModelSerializer):
         position = validated_data.get('position')
         if isinstance(position, dict):
             validated_data['position'] = json.dumps(position)
+        transition_settings = validated_data.get('transition_settings')
+        if isinstance(transition_settings, dict):
+            validated_data['transition_settings'] = json.dumps(transition_settings)
         if 'background_image' in validated_data and validated_data['background_image'] is None:
             validated_data['background_image'] = ''
         if 'thumbnail_url' in validated_data and validated_data['thumbnail_url'] is None:

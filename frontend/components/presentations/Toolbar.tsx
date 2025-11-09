@@ -21,7 +21,11 @@ const primaryButton =
 const subtleButton =
   'p-2 text-slate-200/80 transition hover:text-white hover:bg-white/10 rounded-full';
 
-export default function Toolbar() {
+interface ToolbarProps {
+  onOpenShare?: () => void;
+}
+
+export default function Toolbar({ onOpenShare }: ToolbarProps) {
   const router = useRouter();
   const {
     presentation,
@@ -33,7 +37,7 @@ export default function Toolbar() {
 
   const handleSave = async () => {
     setSaving(true);
-    // Auto-save se întâmplă automat prin updates, dar putem forța o salvare
+    // Auto-save already runs in the background, but we surface a quick state change for feedback
     setTimeout(() => setSaving(false), 500);
   };
 
@@ -168,9 +172,9 @@ export default function Toolbar() {
         )}
 
         <div className="flex items-center gap-3">
-          <button className={subtleButton} title="Share workspace">
-            <Share2 size={18} />
-          </button>
+        <button className={subtleButton} title="Share workspace" onClick={onOpenShare}>
+          <Share2 size={18} />
+        </button>
           <button className={subtleButton} title="Collaborators">
             <Users size={18} />
           </button>

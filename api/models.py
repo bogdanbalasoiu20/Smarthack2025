@@ -124,6 +124,7 @@ class Frame(models.Model):
     background_image = models.CharField(max_length=500)
     order = models.IntegerField()
     thumbnail_url = models.CharField(max_length=500)
+    transition_settings = models.TextField(default='{}')  # JSON
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
     presentation = models.ForeignKey(Presentation, models.DO_NOTHING, db_column='presentation_id',
@@ -164,6 +165,7 @@ class Element(models.Model):
     element_type = models.CharField(max_length=20)
     position = models.TextField()  # JSON stored as text
     content = models.TextField()   # JSON stored as text
+    animation_settings = models.TextField(default='{}')  # JSON stored as text
     link_url = models.CharField(max_length=500, blank=True, default='')
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
