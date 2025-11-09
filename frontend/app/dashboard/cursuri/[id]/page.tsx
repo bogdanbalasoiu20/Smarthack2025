@@ -3,6 +3,10 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { getStoredToken, clearStoredToken } from "@/lib/authToken";
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api";
 
 // --- Definiții Iconițe ---
 
@@ -70,6 +74,14 @@ type CourseMaterial = {
   id: string;
   type: "presentation" | "kahoot";
   title: string;
+};
+
+type OwnedPresentation = {
+  id: number;
+  title: string;
+  description?: string | null;
+  updated_at?: string;
+  current_user_permission?: string | null;
 };
 
 // --- BAZA DE DATE SIMULATĂ PENTRU CURSURI ---
@@ -153,6 +165,9 @@ export default function CourseDetailPage() {
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [ownedPresentations, setOwnedPresentations] = useState<OwnedPresentation[]>([]);
+  const [presentationsLoading, setPresentationsLoading] = useState(true);
+  const [presentationsError, setPresentationsError] = useState<string | null>(null);
 
   // ---------- MODIFICARE CRITICĂ AICI ----------
   // 1. Preluăm rolul utilizatorului și ÎL CONVERTIM LA MAJUSCULE
@@ -191,6 +206,70 @@ export default function CourseDetailPage() {
       return () => clearTimeout(timer);
     }
   }, [courseId]);
+
+  // Fetch user's presentations so we can link them from the course view
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchPresentations = async () => {
+      const token = getStoredToken();
+      if (!token) {
+        if (isMounted) {
+          setPresentationsLoading(false);
+          setOwnedPresentations([]);
+        }
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/presentations/`, {
+          headers: {
+            Authorization: `Token ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (response.status === 401) {
+          clearStoredToken();
+          if (isMounted) {
+            setOwnedPresentations([]);
+            setPresentationsError("Sesiunea a expirat. Autentifică-te din nou.");
+            setPresentationsLoading(false);
+          }
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch presentations");
+        }
+
+        const data = await response.json();
+        if (!isMounted) return;
+
+        const items = Array.isArray(data) ? data : data.results || [];
+        const ownedOnly = items.filter(
+          (item: OwnedPresentation) => item?.current_user_permission === "OWNER"
+        );
+        setOwnedPresentations(ownedOnly);
+        setPresentationsError(null);
+      } catch (error) {
+        console.error("Error fetching presentations:", error);
+        if (isMounted) {
+          setPresentationsError("Nu am putut încărca prezentările tale.");
+          setOwnedPresentations([]);
+        }
+      } finally {
+        if (isMounted) {
+          setPresentationsLoading(false);
+        }
+      }
+    };
+
+    fetchPresentations();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Verificarea va funcționa acum corect, deoarece userRole este "ADMIN" sau "PROFESOR"
   const isTeacherOrAdmin = userRole === "PROFESOR" || userRole === "ADMIN";
@@ -263,6 +342,68 @@ export default function CourseDetailPage() {
       </div>
 
       {/* --- Randare Condiționată (care acum funcționează) --- */}
+
+      <section className="mt-8 rounded-2xl border border-gray-200 bg-white/80 p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900/70">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-sm uppercase tracking-[0.4em] text-gray-500 dark:text-gray-400">
+              Resurse proprii
+            </p>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+              Prezentările tale
+            </h2>
+          </div>
+          <Link
+            href="/presentations"
+            className="text-sm font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-300"
+          >
+            Deschide workspace-ul
+          </Link>
+        </div>
+
+        {presentationsLoading ? (
+          <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            Se încarcă prezentările...
+          </div>
+        ) : presentationsError ? (
+          <div className="mt-8 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">
+            {presentationsError}
+          </div>
+        ) : ownedPresentations.length === 0 ? (
+          <div className="mt-6 rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
+            Nu ai încă prezentări create. Poți începe una nouă din secțiunea
+            „Prezentări”.
+          </div>
+        ) : (
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            {ownedPresentations.map((presentation) => (
+              <Link
+                key={presentation.id}
+                href={`/presentations/${presentation.id}`}
+                className="group rounded-2xl border border-gray-200 bg-white/70 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-900/70"
+              >
+                <p className="text-xs uppercase tracking-[0.3em] text-gray-400 dark:text-gray-500">
+                  {presentation.current_user_permission || "OWNER"}
+                </p>
+                <h3 className="mt-2 text-lg font-semibold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-300">
+                  {presentation.title || "Prezentare fără titlu"}
+                </h3>
+                {presentation.description && (
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                    {presentation.description}
+                  </p>
+                )}
+                {presentation.updated_at && (
+                  <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+                    Actualizată pe{" "}
+                    {new Date(presentation.updated_at).toLocaleDateString("ro-RO")}
+                  </p>
+                )}
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* --- 1. CONȚINUT PENTRU PROFESOR / ADMIN --- */}
       {isTeacherOrAdmin && (
