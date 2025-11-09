@@ -282,6 +282,10 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
         question = self.session.current_question
         submitted_choice_index = content.get('answer')
         time_taken = content.get('time_taken', 1.0)
+        try:
+            time_taken = float(time_taken)
+        except (TypeError, ValueError):
+            time_taken = question.time_limit
 
         if not question or Answer.objects.filter(player=player, question=question).exists():
             print(f"Question not found or already answered")
@@ -295,9 +299,16 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
             return None
             
         is_correct = submitted_choice.is_correct
+        current_streak = player.streak
 
         # 3. Calculează Scorul
-        points_awarded = self.calculate_score(is_correct, question.game.base_points, time_taken, question.time_limit)
+        points_awarded = self.calculate_score(
+            is_correct,
+            question.game.base_points,
+            time_taken,
+            question.time_limit,
+            current_streak
+        )
 
         # 4. Salvează Răspunsul și Actualizează Jucătorul
         Answer.objects.create(
@@ -319,17 +330,23 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
         return (total_answered, points_awarded)
         
     
-    def calculate_score(self, is_correct, base_points, time_taken, time_limit):
-        """Calculează scorul bazat pe corectitudine și rapiditate."""
-        if not is_correct or time_taken >= time_limit:
+    def calculate_score(self, is_correct, base_points, time_taken, time_limit, current_streak=0):
+        """Calculează scorul bazat pe corectitudine, rapiditate și serii de răspunsuri."""
+        if not is_correct:
             return 0
-        
-        # Formula: Scor = Base * (Timp Rămas / Timp Total)
-        time_factor = (time_limit - time_taken) / time_limit
-        time_factor = max(0.0, time_factor) 
-        
-        # Folosim int() pentru a rotunji în jos (scorul Kahoot e mereu întreg)
-        return int(base_points * time_factor)
+
+        safe_limit = max(1.0, float(time_limit or 20))
+        safe_time = max(0.0, min(float(time_taken or 0), safe_limit))
+
+        # Viteza influențează 50% din scor (între 50% și 100% din puncte)
+        speed_ratio = (safe_limit - safe_time) / safe_limit  # 0..1
+        base_score = int(base_points * (0.5 + 0.5 * speed_ratio))
+
+        # Bonus de serie: +10% din punctaj pentru fiecare răspuns corect consecutiv după primul (max 40%)
+        streak_bonus_levels = max(0, min(int(current_streak), 4))
+        streak_bonus = int(base_points * 0.1 * streak_bonus_levels)
+
+        return base_score + streak_bonus
         
         
     async def publish_scores(self):

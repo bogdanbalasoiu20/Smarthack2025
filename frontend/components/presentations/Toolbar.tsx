@@ -15,9 +15,12 @@ import {
   Circle,
   FileText,
   Presentation,
+  Gamepad2,
+  Loader2,
 } from 'lucide-react';
 import { usePresentation } from '@/contexts/PresentationContext';
 import { getStoredToken } from '@/lib/authToken';
+import { API_BASE_URL } from '@/lib/api';
 
 const primaryButton =
   'rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:scale-[1.01] hover:shadow-indigo-500/50';
@@ -36,14 +39,10 @@ export default function Toolbar({ onOpenShare }: ToolbarProps) {
     createElement,
     canEdit,
   } = usePresentation();
-  const [saving, setSaving] = useState(false);
+  const [saving] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
-
-  const handleSave = async () => {
-    setSaving(true);
-    setTimeout(() => setSaving(false), 500);
-  };
+  const [generatingGame, setGeneratingGame] = useState(false);
 
   const ensureEditableContext = () => {
     if (!selectedFrame || !canEdit) {
@@ -178,16 +177,106 @@ export default function Toolbar({ onOpenShare }: ToolbarProps) {
         text: `Your presentation has been exported to ${formatName}.`,
         confirmButtonColor: '#6366f1',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Export error:', error);
+      const message = error instanceof Error ? error.message : 'An error occurred during export.';
       Swal.fire({
         icon: 'error',
         title: 'Export Failed',
-        text: error.message || 'An error occurred during export.',
+        text: message,
         confirmButtonColor: '#ef4444',
       });
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleGenerateGame = async () => {
+    if (!presentation || generatingGame) return;
+
+    const result = await Swal.fire({
+      title: 'Generate AI Game',
+      text: 'How many quiz questions should we create from this presentation? (3-12)',
+      input: 'number',
+      inputValue: 6,
+      inputAttributes: {
+        min: '3',
+        max: '12',
+        step: '1',
+      },
+      showCancelButton: true,
+      confirmButtonText: 'Create game',
+      confirmButtonColor: '#6366f1',
+      cancelButtonColor: '#475569',
+    });
+
+    if (result.isDismissed) {
+      return;
+    }
+
+    let numQuestions = parseInt(result.value || '6', 10);
+    if (Number.isNaN(numQuestions)) numQuestions = 6;
+    numQuestions = Math.min(12, Math.max(3, numQuestions));
+
+    try {
+      setGeneratingGame(true);
+      const token = getStoredToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      Swal.fire({
+        title: 'Creating AI game...',
+        text: 'We are summarizing your slides and drafting quiz questions.',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
+      const response = await fetch(
+        `${API_BASE_URL}/presentations/${presentation.id}/generate-game/`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Token ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ num_questions: numQuestions }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Unable to generate game');
+      }
+
+      await response.json();
+      Swal.fire({
+        icon: 'success',
+        title: 'Game ready!',
+        text: 'Check the Games dashboard to host your new quiz.',
+        confirmButtonText: 'Go to games',
+        confirmButtonColor: '#16a34a',
+        showCancelButton: true,
+        cancelButtonText: 'Stay here',
+        cancelButtonColor: '#1e293b',
+      }).then((action) => {
+        if (action.isConfirmed) {
+          router.push('/game/host');
+        }
+      });
+    } catch (error: unknown) {
+      console.error('Error generating AI game:', error);
+      const message = error instanceof Error ? error.message : 'Please try again.';
+      Swal.fire({
+        icon: 'error',
+        title: 'Could not generate game',
+        text: message,
+        confirmButtonColor: '#ef4444',
+      });
+    } finally {
+      setGeneratingGame(false);
     }
   };
 
@@ -250,6 +339,17 @@ export default function Toolbar({ onOpenShare }: ToolbarProps) {
           <button className={subtleButton} title="Collaborators">
             <Users size={18} />
           </button>
+
+          {canEdit && (
+            <button
+              className={subtleButton}
+              title="Create AI game from slides"
+              onClick={handleGenerateGame}
+              disabled={generatingGame}
+            >
+              {generatingGame ? <Loader2 className="animate-spin" size={18} /> : <Gamepad2 size={18} />}
+            </button>
+          )}
 
           <div className="relative">
             <button

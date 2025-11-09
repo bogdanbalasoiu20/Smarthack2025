@@ -10,7 +10,7 @@ const API_BASE_URL =
 
 // --- Definiții Iconițe ---
 
-const ArrowLeft = (props) => (
+const ArrowLeft = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width="24"
@@ -28,7 +28,7 @@ const ArrowLeft = (props) => (
   </svg>
 );
 
-const FileText = (props) => (
+const FileText = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width="24"
@@ -49,7 +49,7 @@ const FileText = (props) => (
   </svg>
 );
 
-const Brain = (props) => (
+const Brain = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width="24"

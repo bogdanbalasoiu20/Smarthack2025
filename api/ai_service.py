@@ -160,6 +160,90 @@ IMPORTANT: Return ONLY the JSON, no other text."""
         except Exception as e:
             raise Exception(f"AI generation failed: {str(e)}")
 
+    def generate_quiz_from_slides(self, slides: list[str], num_questions: int = 6) -> dict:
+        """
+        Generate quiz questions (Kahoot-style) from provided slide summaries.
+
+        Args:
+            slides: List of slide texts or summaries.
+            num_questions: Desired number of questions (3-12 recommended).
+
+        Returns:
+            dict with keys: title, description, questions -> [{text, time_limit, choices: [{text, is_correct}]}]
+        """
+
+        if not slides:
+            raise ValueError("Cannot generate quiz without slide content")
+
+        clamped_questions = max(3, min(num_questions or 6, 12))
+        slide_context = "\n".join(f"Slide {idx + 1}: {text}" for idx, text in enumerate(slides))
+
+        system_prompt = """You are an expert quiz master. Read the provided slide summaries and build a multiple choice quiz.
+Return strictly JSON with this structure:
+{
+  "title": "string - catchy quiz title",
+  "description": "string - short summary",
+  "questions": [
+    {
+      "text": "string - clear question referencing the slide content",
+      "time_limit": number - between 15 and 45 seconds,
+      "choices": [
+        {"text": "string answer option", "is_correct": true/false},
+        {"text": "...", "is_correct": false},
+        {"text": "...", "is_correct": false},
+        {"text": "...", "is_correct": false}
+      ]
+    }
+  ]
+}
+Guidelines:
+- Create exactly 4 choices per question.
+- Exactly ONE choice must have "is_correct": true.
+- Questions must be inferable from the slide summaries; avoid new facts.
+- Vary correct answer positions, keep concise wording.
+- time_limit should match difficulty (default 20-30 seconds)."""
+
+        user_message = f"""Slides:\n{slide_context}\n\nCreate {clamped_questions} quiz questions."""
+
+        try:
+            message = self.client.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=3072,
+                temperature=0.6,
+                system=system_prompt,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": user_message
+                    }
+                ]
+            )
+
+            response_text = message.content[0].text.strip()
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+
+            quiz_data = json.loads(response_text.strip())
+
+            if not all(key in quiz_data for key in ["title", "description", "questions"]):
+                raise ValueError("Invalid quiz format from AI")
+
+            if not quiz_data["questions"]:
+                raise ValueError("Quiz generation returned no questions")
+
+            return quiz_data
+
+        except anthropic.APIError as e:
+            raise Exception(f"Anthropic API error: {str(e)}")
+        except json.JSONDecodeError as e:
+            raise Exception(f"Failed to parse AI quiz response: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Quiz generation failed: {str(e)}")
+
     def enhance_slide_content(self, text: str, style: str = "professional") -> str:
         """
         Enhance or rewrite slide text with different styles.

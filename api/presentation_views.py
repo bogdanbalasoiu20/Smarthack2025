@@ -6,6 +6,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 from django.db.models import Q
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -25,6 +26,8 @@ from .presentation_serializers import (
 )
 from .ai_service import PresentationAIService
 from .export_service import PresentationExportService
+from game_module.models import Game, Question as GameQuestion, Choice as GameChoice
+from game_module.serializers import GameSerializer
 
 
 # ===== PERMISIUNI CUSTOM =====
@@ -271,6 +274,122 @@ class PresentationViewSet(viewsets.ModelViewSet):
             'version': '1.0',
             'exported_at': timezone.now().isoformat()
         })
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], url_path='generate-game')
+    def generate_game(self, request, pk=None):
+        """Generate a Kahoot-style game from the current presentation using AI."""
+        presentation = self.get_object()
+        self.check_object_permissions(request, presentation)
+
+        # Gather slide text content
+        slide_texts = []
+        for frame in presentation.frames.all():
+            snippets = []
+            for element in frame.elements.all():
+                if element.element_type != 'TEXT':
+                    continue
+                raw_content = element.content or ''
+                text_content = ''
+                try:
+                    parsed = json.loads(raw_content)
+                    text_content = parsed.get('text', '')
+                except (ValueError, TypeError):
+                    text_content = raw_content
+                text_content = (text_content or '').strip()
+                if text_content:
+                    snippets.append(text_content)
+            if snippets:
+                slide_texts.append(" ".join(snippets))
+
+        if not slide_texts:
+            return Response(
+                {"error": "Nu s-au găsit texte în prezentare pentru a genera întrebări."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        num_questions = request.data.get('num_questions')
+        try:
+            num_questions = int(num_questions) if num_questions else 6
+        except (TypeError, ValueError):
+            num_questions = 6
+
+        ai_service = PresentationAIService()
+        try:
+            quiz_payload = ai_service.generate_quiz_from_slides(slide_texts, num_questions=num_questions)
+        except Exception as exc:
+            return Response(
+                {"error": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        title = quiz_payload.get('title') or f"{presentation.title} Quiz"
+        description = quiz_payload.get('description') or presentation.description or ''
+        questions = quiz_payload.get('questions', [])
+
+        if not questions:
+            return Response(
+                {"error": "AI nu a generat nicio întrebare. Încearcă din nou."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        base_points = request.data.get('base_points', 1000)
+        try:
+            base_points = int(base_points)
+        except (TypeError, ValueError):
+            base_points = 1000
+
+        with transaction.atomic():
+            game = Game.objects.create(
+                title=title[:255],
+                description=description,
+                host=request.user,
+                base_points=base_points
+            )
+
+            for order, question_payload in enumerate(questions):
+                question_text = (question_payload.get('text') or '').strip()
+                if not question_text:
+                    continue
+                time_limit = question_payload.get('time_limit') or 20
+                try:
+                    time_limit = int(time_limit)
+                except (TypeError, ValueError):
+                    time_limit = 20
+                time_limit = max(10, min(time_limit, 90))
+
+                question = GameQuestion.objects.create(
+                    game=game,
+                    text=question_text,
+                    order=order,
+                    time_limit=time_limit,
+                    type='choice'
+                )
+
+                choices_payload = question_payload.get('choices') or []
+                if not choices_payload:
+                    # fallback: create generic true/false
+                    choices_payload = [
+                        {"text": "Adevărat", "is_correct": True},
+                        {"text": "Fals", "is_correct": False},
+                    ]
+
+                has_correct = any(bool(choice.get('is_correct')) for choice in choices_payload)
+                if not has_correct and choices_payload:
+                    choices_payload[0]['is_correct'] = True
+
+                for idx, choice_payload in enumerate(choices_payload[:4]):
+                    choice_text = (choice_payload.get('text') or '').strip()
+                    if not choice_text:
+                        continue
+                    GameChoice.objects.create(
+                        question=question,
+                        text=choice_text[:400],
+                        is_correct=bool(choice_payload.get('is_correct')),
+                        order=idx
+                    )
+
+        serializer = GameSerializer(game, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
     def create_version(self, request, pk=None):
