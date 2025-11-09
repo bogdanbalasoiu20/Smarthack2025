@@ -593,20 +593,35 @@ def ai_rewrite_text(request):
         "mode": "shorter" | "longer" | "professional" | "casual"
     }
     """
-    text = request.data.get('text', '')
+    text = request.data.get('text', '').strip()
     mode = request.data.get('mode', 'professional')
 
-    # TODO: Integrare AI_CLIENT
-    prompt = f"Rescrie următorul text într-un stil {mode}: {text}"
+    if not text:
+        return Response(
+            {'error': 'Text is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-    # MOCK
-    mock_result = f"[{mode.upper()}] {text}"
+    try:
+        ai_service = PresentationAIService()
+        rewritten = ai_service.enhance_slide_content(text, style=mode)
 
-    return Response({
-        'original': text,
-        'rewritten': mock_result,
-        'mode': mode
-    })
+        return Response({
+            'original': text,
+            'rewritten': rewritten,
+            'mode': mode
+        })
+
+    except ValueError as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to rewrite text: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(['POST'])
@@ -628,16 +643,79 @@ def ai_suggest_visuals(request):
         ]
     }
     """
-    text = request.data.get('text', '')
+    text = request.data.get('text', '').strip()
 
-    # TODO: AI_CLIENT
-    # MOCK
-    suggestions = [
-        {"type": "icon", "keyword": "presentation", "relevance": 0.9},
-        {"type": "image", "keyword": "teamwork", "relevance": 0.7}
-    ]
+    if not text:
+        return Response(
+            {'error': 'Text is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-    return Response({'suggestions': suggestions})
+    try:
+        ai_service = PresentationAIService()
+        suggestions = ai_service.suggest_visuals(text)
+
+        return Response({'suggestions': suggestions})
+
+    except ValueError as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to suggest visuals: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def ai_get_slide_advice(request):
+    """
+    Get AI advice for improving a slide.
+
+    Input:
+    {
+        "slide_content": "text content of the slide",
+        "context": "optional presentation context"
+    }
+
+    Output:
+    {
+        "overall_score": 8,
+        "strengths": ["Clear message", "Good structure"],
+        "improvements": ["Add more visuals", "Reduce text"],
+        "content_advice": "...",
+        "design_advice": "...",
+        "quick_wins": ["Increase font size", "Add bullet points"]
+    }
+    """
+    slide_content = request.data.get('slide_content', '').strip()
+    context = request.data.get('context', '')
+
+    if not slide_content:
+        return Response(
+            {'error': 'Slide content is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        ai_service = PresentationAIService()
+        advice = ai_service.give_slide_advice(slide_content, context)
+
+        return Response(advice)
+
+    except ValueError as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to get slide advice: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(['POST'])

@@ -183,7 +183,7 @@ IMPORTANT: Return ONLY the JSON, no other text."""
 
         try:
             message = self.client.messages.create(
-                model="claude-3-5-sonnet-20240620",
+                model="claude-sonnet-4-5",
                 max_tokens=1024,
                 temperature=0.7,
                 messages=[
@@ -198,3 +198,120 @@ IMPORTANT: Return ONLY the JSON, no other text."""
 
         except Exception as e:
             raise Exception(f"Text enhancement failed: {str(e)}")
+
+    def suggest_visuals(self, text: str) -> list:
+        """
+        Suggest visual elements (images, icons, charts) based on text content.
+
+        Args:
+            text: The content to analyze
+
+        Returns:
+            List of visual suggestions with type and keywords
+        """
+        try:
+            message = self.client.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=1024,
+                temperature=0.7,
+                system="""You are a visual design expert. Analyze the given text and suggest relevant visual elements.
+
+Return a JSON array of suggestions with this format:
+[
+  {
+    "type": "icon" | "image" | "chart" | "diagram",
+    "keyword": "string - search term or description",
+    "relevance": number between 0-1,
+    "description": "brief explanation of why this visual helps"
+  }
+]
+
+Suggest 3-5 visual elements that would enhance the message. Return ONLY the JSON array.""",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"Suggest visuals for this content:\n\n{text}"
+                    }
+                ]
+            )
+
+            response_text = message.content[0].text.strip()
+
+            # Remove markdown code blocks if present
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+
+            response_text = response_text.strip()
+
+            import json
+            suggestions = json.loads(response_text)
+            return suggestions
+
+        except Exception as e:
+            raise Exception(f"Visual suggestion failed: {str(e)}")
+
+    def give_slide_advice(self, slide_content: str, context: str = "") -> dict:
+        """
+        Analyze a slide and give improvement advice.
+
+        Args:
+            slide_content: Current content of the slide
+            context: Optional context about the presentation
+
+        Returns:
+            Dict with advice and suggestions
+        """
+        try:
+            message = self.client.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=2048,
+                temperature=0.7,
+                system="""You are an expert presentation coach. Analyze slides and provide actionable advice.
+
+Return a JSON object with this format:
+{
+  "overall_score": number 1-10,
+  "strengths": ["string - what works well"],
+  "improvements": ["string - specific suggestions"],
+  "content_advice": "string - advice about the content",
+  "design_advice": "string - advice about visual design",
+  "quick_wins": ["string - easy improvements to make now"]
+}
+
+Be specific, constructive, and actionable. Return ONLY the JSON object.""",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"""Analyze this slide and give improvement advice:
+
+Slide Content: {slide_content}
+
+{f'Presentation Context: {context}' if context else ''}
+
+Provide specific, actionable advice to make this slide more effective."""
+                    }
+                ]
+            )
+
+            response_text = message.content[0].text.strip()
+
+            # Remove markdown code blocks if present
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+
+            response_text = response_text.strip()
+
+            import json
+            advice = json.loads(response_text)
+            return advice
+
+        except Exception as e:
+            raise Exception(f"Slide advice failed: {str(e)}")

@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Swal from 'sweetalert2';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getStoredToken } from '@/lib/authToken';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api';
 
 interface AIGenerateDialogProps {
   open: boolean;
@@ -12,217 +11,269 @@ interface AIGenerateDialogProps {
   onSuccess: (presentationId: number) => void;
 }
 
+const QUICK_PROMPTS = [
+  'Break down the latest sustainability trends for enterprise leaders.',
+  'Present our Q4 sales performance and the growth plan for 2025.',
+  'Prepare an onboarding walkthrough for new hires in product teams.',
+  'Explain the basics of machine learning for a non-technical audience.',
+];
+
+const PROMPT_TIPS = [
+  'Mention the audience and tone so AI can adapt the voice.',
+  'List the key points, milestones, or data you must cover.',
+  'Add KPIs or heroic stats the AI should highlight.',
+];
+
 export default function AIGenerateDialog({ open, onOpenChange, onSuccess }: AIGenerateDialogProps) {
   const [prompt, setPrompt] = useState('');
-  const [numSlides, setNumSlides] = useState<number | ''>('');
+  const [numSlides, setNumSlides] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState('Ready to brainstorm with you.');
 
   useEffect(() => {
-    if (open) {
-      showDialog();
-    }
+    if (!open) return;
+    setPrompt('');
+    setNumSlides('');
+    setError(null);
+    setStatus('Ready to brainstorm with you.');
   }, [open]);
 
-  const showDialog = async () => {
-    const { value: formValues } = await Swal.fire({
-      title: '<div style="display: flex; align-items: center; gap: 8px;"><span>✨</span> Generate Presentation with AI</div>',
-      html: `
-        <div style="text-align: left; margin-bottom: 20px;">
-          <p style="color: #666; font-size: 14px; margin-bottom: 20px;">
-            Describe what presentation you want and AI will create it for you with slides and content.
-          </p>
+  useEffect(() => {
+    if (!open) return;
 
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; font-weight: 500; margin-bottom: 8px; text-align: left;">
-              What presentation do you want to create?
-            </label>
-            <textarea
-              id="swal-prompt"
-              class="swal2-input"
-              style="width: 100%; height: 100px; resize: none; margin: 0; padding: 10px;"
-              placeholder="Example: Create a presentation about climate change solutions with focus on renewable energy..."
-            ></textarea>
-            <p style="color: #999; font-size: 12px; margin-top: 4px;">
-              Be specific about the topic, audience, and key points you want to cover.
-            </p>
-          </div>
-
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; font-weight: 500; margin-bottom: 8px; text-align: left;">
-              Number of slides (optional)
-            </label>
-            <input
-              id="swal-slides"
-              type="number"
-              class="swal2-input"
-              style="width: 100%; margin: 0;"
-              placeholder="Leave empty for AI to decide"
-              min="3"
-              max="20"
-            />
-            <p style="color: #999; font-size: 12px; margin-top: 4px;">
-              If not specified, AI will create an appropriate number of slides (typically 5-10).
-            </p>
-          </div>
-
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; font-weight: 500; margin-bottom: 8px; text-align: left;">
-              Example prompts:
-            </label>
-            <div style="display: flex; flex-direction: column; gap: 4px;">
-              <button
-                type="button"
-                onclick="document.getElementById('swal-prompt').value='Create a presentation about the benefits of remote work'"
-                style="text-align: left; padding: 8px; border: none; background: #f0f0f0; border-radius: 4px; cursor: pointer; font-size: 13px;"
-                onmouseover="this.style.background='#e0e0e0'"
-                onmouseout="this.style.background='#f0f0f0'"
-              >
-                • Create a presentation about the benefits of remote work
-              </button>
-              <button
-                type="button"
-                onclick="document.getElementById('swal-prompt').value='Present our Q4 sales results and 2024 goals'"
-                style="text-align: left; padding: 8px; border: none; background: #f0f0f0; border-radius: 4px; cursor: pointer; font-size: 13px;"
-                onmouseover="this.style.background='#e0e0e0'"
-                onmouseout="this.style.background='#f0f0f0'"
-              >
-                • Present our Q4 sales results and 2024 goals
-              </button>
-              <button
-                type="button"
-                onclick="document.getElementById('swal-prompt').value='Introduction to machine learning for beginners'"
-                style="text-align: left; padding: 8px; border: none; background: #f0f0f0; border-radius: 4px; cursor: pointer; font-size: 13px;"
-                onmouseover="this.style.background='#e0e0e0'"
-                onmouseout="this.style.background='#f0f0f0'"
-              >
-                • Introduction to machine learning for beginners
-              </button>
-              <button
-                type="button"
-                onclick="document.getElementById('swal-prompt').value='Company onboarding for new employees'"
-                style="text-align: left; padding: 8px; border: none; background: #f0f0f0; border-radius: 4px; cursor: pointer; font-size: 13px;"
-                onmouseover="this.style.background='#e0e0e0'"
-                onmouseout="this.style.background='#f0f0f0'"
-              >
-                • Company onboarding for new employees
-              </button>
-            </div>
-          </div>
-
-          <p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">
-            Tip: Press Cmd/Ctrl + Enter to generate
-          </p>
-        </div>
-      `,
-      width: 650,
-      showCancelButton: true,
-      confirmButtonText: '✨ Generate Presentation',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#8b5cf6',
-      cancelButtonColor: '#6b7280',
-      focusConfirm: false,
-      didOpen: () => {
-        const promptInput = document.getElementById('swal-prompt') as HTMLTextAreaElement;
-        if (promptInput) {
-          promptInput.focus();
-          // Handle Ctrl/Cmd + Enter
-          promptInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              Swal.clickConfirm();
-            }
-          });
-        }
-      },
-      preConfirm: () => {
-        const promptInput = document.getElementById('swal-prompt') as HTMLTextAreaElement;
-        const slidesInput = document.getElementById('swal-slides') as HTMLInputElement;
-
-        const promptValue = promptInput.value.trim();
-
-        if (!promptValue) {
-          Swal.showValidationMessage('Please describe what presentation you want to create');
-          return false;
-        }
-
-        return {
-          prompt: promptValue,
-          numSlides: slidesInput.value ? parseInt(slidesInput.value) : null,
-        };
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !submitting) {
+        onOpenChange(false);
       }
-    });
+      if ((event.metaKey || event.ctrlKey) === true && event.key === 'Enter' && !submitting) {
+        event.preventDefault();
+        handleSubmit();
+      }
+    };
 
-    if (formValues) {
-      await handleGenerate(formValues.prompt, formValues.numSlides);
-    }
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  }, [open, submitting, onOpenChange, handleSubmit]);
 
-    // Close the dialog
+  const formattedSlides = useMemo(() => {
+    if (!numSlides) return null;
+    const parsed = parseInt(numSlides, 10);
+    if (Number.isNaN(parsed)) return null;
+    return parsed;
+  }, [numSlides]);
+
+  const closeDialog = () => {
+    if (submitting) return;
     onOpenChange(false);
   };
 
-  const handleGenerate = async (promptValue: string, numSlidesValue: number | null) => {
-    // Show loading
-    Swal.fire({
-      title: 'Generating Presentation...',
-      html: 'AI is creating your presentation. This may take 5-15 seconds.',
-      allowOutsideClick: false,
-      didOpen: () => {
-        Swal.showLoading();
-      }
-    });
+  const handleSubmit = useCallback(async () => {
+    if (submitting) return;
+    if (!prompt.trim()) {
+      setError('Please describe what you would like the AI to create.');
+      return;
+    }
+
+    if (formattedSlides && (formattedSlides < 3 || formattedSlides > 20)) {
+      setError('Pick between 3 and 20 slides, or leave it empty for auto.');
+      return;
+    }
+
+    setError(null);
+    setSubmitting(true);
+    setStatus('Talking with the AI studio. This usually takes ~10 seconds.');
 
     try {
       const token = getStoredToken();
-
       if (!token) {
-        throw new Error('Authentication required. Please log in again.');
+        throw new Error('Authentication required. Please sign in again.');
       }
 
       const response = await fetch(`${API_BASE_URL}/ai/generate-full/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Token ${token}`,
+          Authorization: `Token ${token}`,
         },
         body: JSON.stringify({
-          prompt: promptValue,
-          num_slides: numSlidesValue,
+          prompt: prompt.trim(),
+          num_slides: formattedSlides ?? null,
         }),
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to generate presentation');
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to generate presentation.');
       }
 
       const data = await response.json();
-
-      // Close loading and show success
-      await Swal.fire({
-        title: 'Success!',
-        html: `
-          <p>AI-generated presentation created successfully!</p>
-          <p style="margin-top: 10px;"><strong>${data.title}</strong></p>
-          <p style="color: #666; font-size: 14px;">${data.num_frames} slides created</p>
-        `,
-        icon: 'success',
-        confirmButtonText: 'Open Presentation',
-        confirmButtonColor: '#8b5cf6',
-      });
-
-      // Notify parent component
+      setStatus('Presentation ready. Opening it now.');
+      onOpenChange(false);
       onSuccess(data.presentation_id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Something went wrong while generating.';
+      setError(message);
+      setStatus('Need help rewriting the prompt?');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [formattedSlides, onOpenChange, onSuccess, prompt, submitting]);
 
-    } catch (err: any) {
-      // Show error
-      await Swal.fire({
-        title: 'Error',
-        text: err.message || 'An error occurred while generating the presentation',
-        icon: 'error',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#ef4444',
-      });
+  const handleExampleClick = (example: string) => {
+    setPrompt(example);
+    setError(null);
+  };
+
+  const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) {
+      closeDialog();
     }
   };
 
-  return null; // Component doesn't render anything, uses SweetAlert2 dialogs
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur"
+      onClick={handleOverlayClick}
+      aria-modal="true"
+      role="dialog"
+    >
+      <div
+        className="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-[32px] border border-white/10 bg-slate-900/90 text-white shadow-[0_40px_120px_rgba(2,6,23,0.8)] backdrop-blur-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+          <div>
+            <p className="text-xs uppercase tracking-[0.4em] text-white/40">AI Studio</p>
+            <h2 className="text-2xl font-semibold">Generate a presentation</h2>
+          </div>
+          <button
+            type="button"
+            onClick={closeDialog}
+            disabled={submitting}
+            className="rounded-full border border-white/10 px-4 py-2 text-sm text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="grid gap-6 p-6 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="space-y-4 rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900 via-slate-900/70 to-indigo-900/40 p-5">
+            <div className="flex flex-wrap gap-2 text-xs text-white/60">
+              <span className="rounded-full border border-white/15 px-3 py-1">Storyline</span>
+              <span className="rounded-full border border-white/15 px-3 py-1">Content</span>
+              <span className="rounded-full border border-white/15 px-3 py-1">Design cues</span>
+            </div>
+            <p className="text-base text-white/80">
+              Describe the story, audience, tone, or metrics you want highlighted. AI will craft slides,
+              speaking points, and structure for you.
+            </p>
+            <div className="space-y-3">
+              {QUICK_PROMPTS.map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  onClick={() => handleExampleClick(example)}
+                  className="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-white/80 transition hover:border-white/30 hover:bg-white/10"
+                >
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 text-lg">
+                    ✨
+                  </span>
+                  <span className="group-hover:text-white">{example}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <form
+            className="flex flex-col gap-5 rounded-3xl border border-white/10 bg-white/5 p-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleSubmit();
+            }}
+          >
+            <label className="space-y-2 text-sm font-medium tracking-wide text-white/80">
+              What should we create?
+              <textarea
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                placeholder="Example: Create an 8-slide pitch about our AI reporting assistant. Audience: busy execs..."
+                className="min-h-[140px] w-full rounded-2xl border border-white/10 bg-slate-950/30 p-4 text-white placeholder:text-white/40 focus:border-indigo-400 focus:outline-none"
+                disabled={submitting}
+              />
+            </label>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2 text-sm font-medium tracking-wide text-white/80">
+                Number of slides (optional)
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={3}
+                  max={20}
+                  value={numSlides}
+                  onChange={(event) => setNumSlides(event.target.value)}
+                  placeholder="Auto"
+                  className="w-full rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3 text-white placeholder:text-white/40 focus:border-indigo-400 focus:outline-none"
+                  disabled={submitting}
+                />
+                <p className="text-xs font-normal text-white/45">Leave blank to let AI pick the ideal count.</p>
+              </label>
+
+              <div className="space-y-2 text-sm font-medium tracking-wide text-white/80">
+                Tips for a better brief
+                <ul className="space-y-2 rounded-2xl border border-white/10 bg-slate-950/20 p-4 text-xs text-white/70">
+                  {PROMPT_TIPS.map((tip) => (
+                    <li key={tip} className="flex gap-2">
+                      <span className="text-indigo-300">•</span>
+                      <span>{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {error && (
+              <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-200">
+                {error}
+              </div>
+            )}
+
+            <div className="rounded-2xl border border-white/10 bg-slate-950/20 px-4 py-3 text-sm text-white/70">
+              {submitting ? (
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex h-3 w-3 animate-ping rounded-full bg-indigo-400" />
+                  {status}
+                </div>
+              ) : (
+                status
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="inline-flex flex-1 items-center justify-center rounded-2xl bg-gradient-to-r from-indigo-500 via-purple-500 to-blue-500 px-6 py-3 text-base font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:shadow-indigo-500/60 disabled:cursor-not-allowed disabled:opacity-60 md:flex-none"
+              >
+                {submitting ? 'Generating...' : 'Generate presentation'}
+              </button>
+              <button
+                type="button"
+                onClick={closeDialog}
+                disabled={submitting}
+                className="rounded-2xl border border-white/15 px-6 py-3 text-sm font-medium text-white/80 transition hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
 }

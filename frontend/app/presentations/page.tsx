@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getStoredToken, clearStoredToken } from "@/lib/authToken";
 import AIGenerateDialog from "@/components/presentations/AIGenerateDialog";
-import Swal from "sweetalert2";
 
 interface Presentation {
   id: number;
