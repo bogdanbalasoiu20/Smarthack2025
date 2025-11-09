@@ -1,18 +1,34 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { getStoredToken } from '@/lib/authToken';
-import { API_BASE_URL } from '@/lib/api';
-import Swal from 'sweetalert2';
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Swal from "sweetalert2";
+
+import { API_BASE_URL } from "@/lib/api";
+import { getStoredToken } from "@/lib/authToken";
 
 type Game = {
   id: number;
   title: string;
-  description: string;
+  description?: string;
   base_points: number;
-  questions: any[];
+  questions?: any[];
   created_at: string;
+};
+
+const formatDate = (value?: string) => {
+  if (!value) {
+    return "";
+  }
+
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+    }).format(new Date(value));
+  } catch (error) {
+    return "";
+  }
 };
 
 export default function GameHostPage() {
@@ -23,7 +39,7 @@ export default function GameHostPage() {
   useEffect(() => {
     const token = getStoredToken();
     if (!token) {
-      router.replace('/login');
+      router.replace("/login");
       return;
     }
     fetchGames();
@@ -31,32 +47,33 @@ export default function GameHostPage() {
 
   const fetchGames = async () => {
     const token = getStoredToken();
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/games/`, {
         headers: {
-          'Authorization': `Token ${token}`,
-          'Content-Type': 'application/json',
+          Authorization: `Token ${token}`,
+          "Content-Type": "application/json",
         },
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        // Ensure data is an array
-        if (Array.isArray(data)) {
-          setGames(data);
-        } else if (data.results && Array.isArray(data.results)) {
-          // Handle paginated response
-          setGames(data.results);
-        } else {
-          console.error('Unexpected data format:', data);
-          setGames([]);
-        }
+      if (!response.ok) {
+        throw new Error("Failed to fetch games");
+      }
+
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setGames(data);
+      } else if (Array.isArray(data?.results)) {
+        setGames(data.results);
       } else {
-        console.error('Failed to fetch games:', response.status);
         setGames([]);
       }
     } catch (error) {
-      console.error('Error fetching games:', error);
+      console.error("Error fetching games:", error);
       setGames([]);
     } finally {
       setLoading(false);
@@ -65,210 +82,194 @@ export default function GameHostPage() {
 
   const startGameSession = async (gameId: number) => {
     const token = getStoredToken();
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/games/${gameId}/create_session/`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Token ${token}`,
-          'Content-Type': 'application/json',
+          Authorization: `Token ${token}`,
+          "Content-Type": "application/json",
         },
       });
 
-      if (response.ok) {
-        const session = await response.json();
-
-        await Swal.fire({
-          title: 'Game Session Created!',
-          html: `
-            <div style="text-align: center;">
-              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                          padding: 30px;
-                          border-radius: 20px;
-                          margin: 20px 0;">
-                <div style="color: #fff; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;">
-                  Game PIN
-                </div>
-                <div style="color: #fff; font-size: 72px; font-weight: 900; letter-spacing: 12px; font-family: 'Courier New', monospace;">
-                  ${session.pin}
-                </div>
-              </div>
-              <p style="color: #666; margin-top: 20px;">Players can join at: <strong>localhost:3000/game/join</strong></p>
-            </div>
-          `,
-          icon: 'success',
-          confirmButtonText: 'Go to Lobby',
-          confirmButtonColor: '#667eea',
-          showCancelButton: true,
-          cancelButtonText: 'Copy PIN',
-        }).then((result) => {
-          if (result.isConfirmed) {
-            router.push(`/game/lobby/${session.pin}`);
-          } else if (result.isDismissed) {
-            navigator.clipboard.writeText(session.pin);
-            Swal.fire({
-              title: 'PIN Copied!',
-              text: `PIN ${session.pin} copied to clipboard`,
-              icon: 'success',
-              timer: 2000,
-              showConfirmButton: false,
-            });
-          }
-        });
-      } else {
-        throw new Error('Failed to create session');
+      if (!response.ok) {
+        throw new Error("Failed to create session");
       }
+
+      const session = await response.json();
+      const joinUrl =
+        typeof window !== "undefined" ? `${window.location.origin}/game/join` : "your portal";
+
+      await Swal.fire({
+        background: "#0f172a",
+        color: "#e2e8f0",
+        title: "Session ready",
+        html: `
+          <div style="display:flex;flex-direction:column;gap:16px;align-items:center;">
+            <p style="letter-spacing:0.4em;text-transform:uppercase;font-size:12px;color:#a5b4fc;margin:0;">PIN</p>
+            <div style="font-size:64px;font-weight:800;letter-spacing:0.35em;font-family:'Geist Mono','Courier New',monospace;color:#fff;">${session.pin}</div>
+            <p style="font-size:14px;color:#94a3b8;margin-top:8px;">Share the PIN or send students to <strong>${joinUrl}</strong></p>
+          </div>
+        `,
+        confirmButtonText: "Open lobby",
+        confirmButtonColor: "#6366f1",
+        showCancelButton: true,
+        cancelButtonText: "Copy PIN",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          router.push(`/game/lobby/${session.pin}`);
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+          navigator.clipboard.writeText(session.pin);
+          Swal.fire({
+            toast: true,
+            position: "bottom",
+            timer: 2500,
+            showConfirmButton: false,
+            background: "#0f172a",
+            color: "#e2e8f0",
+            title: `PIN ${session.pin} copied`,
+          });
+        }
+      });
     } catch (error) {
       Swal.fire({
-        title: 'Error',
-        text: 'Failed to create game session',
-        icon: 'error',
-        confirmButtonColor: '#ef4444',
+        title: "Unable to create session",
+        text: "Please try again in a moment.",
+        icon: "error",
+        confirmButtonColor: "#ef4444",
+        background: "#0f172a",
+        color: "#e2e8f0",
       });
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-        <div className="text-white text-2xl">Loading games...</div>
+      <div className="app-page flex items-center justify-center">
+        <div className="glass-card px-10 py-8 text-center text-slate-300">Loading your quizzes…</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-6xl font-black text-white mb-4" style={{
-            textShadow: '0 0 40px rgba(255,255,255,0.5)',
-          }}>
-            Host a Game
-          </h1>
-          <p className="text-xl text-purple-200">Select a game to start a session</p>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex justify-center gap-4 mb-12">
-          <button
-            onClick={() => router.push('/dashboard/create')}
-            className="px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-white font-semibold hover:bg-white/20 transition-all duration-300 shadow-lg hover:shadow-2xl hover:scale-105"
-          >
-            + Create New Game
-          </button>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-white font-semibold hover:bg-white/20 transition-all duration-300 shadow-lg hover:shadow-2xl hover:scale-105"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-
-        {/* Games Grid */}
-        {games.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-12 max-w-2xl mx-auto">
-              <h3 className="text-3xl font-bold text-white mb-4">No Games Yet</h3>
-              <p className="text-purple-200 mb-8">Create your first game to get started!</p>
+    <div className="app-page">
+      <div className="game-shell">
+        <header className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="space-y-3">
+              <p className="app-pill">Live quiz studio</p>
+              <div>
+                <h1 className="text-4xl font-semibold text-white">Host a live session</h1>
+                <p className="text-slate-300">Pick a deck, launch a PIN, and guide everyone through it.</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button onClick={() => router.push("/dashboard/create")} className="app-button">
+                Create new game
+              </button>
               <button
-                onClick={() => router.push('/dashboard/create')}
-                className="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-2xl hover:scale-105 transition-transform duration-300 shadow-lg"
+                onClick={() => router.push("/dashboard")}
+                className="rounded-full border border-white/10 px-6 py-3 text-sm font-semibold text-slate-200 transition-colors hover:border-white/30"
               >
-                Create Your First Game
+                Back to dashboard
               </button>
             </div>
           </div>
+        </header>
+
+        {games.length === 0 ? (
+          <div className="glass-card px-6 py-12 text-center">
+            <p className="text-xl font-semibold text-white">No quizzes yet</p>
+            <p className="mt-2 text-slate-300">Build your first deck to unlock the live experience.</p>
+            <button onClick={() => router.push("/dashboard/create")} className="app-button mt-6 justify-center">
+              Start designing
+            </button>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {games.map((game) => (
-              <div
-                key={game.id}
-                className="group relative bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-8 hover:bg-white/15 transition-all duration-300 hover:scale-105 hover:shadow-2xl"
-              >
-                {/* Game Card Content */}
-                <div className="mb-6">
-                  <h3 className="text-2xl font-bold text-white mb-3 line-clamp-2">
-                    {game.title}
-                  </h3>
-                  {game.description && (
-                    <p className="text-purple-200 text-sm line-clamp-3 mb-4">
-                      {game.description}
-                    </p>
-                  )}
-
-                  {/* Game Stats */}
-                  <div className="flex items-center gap-6 text-sm text-purple-300">
-                    <div className="flex items-center gap-2">
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
-                        <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd"/>
-                      </svg>
-                      <span>{game.questions?.length || 0} Questions</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                      </svg>
-                      <span>{game.base_points} pts</span>
-                    </div>
+          <div className="game-grid two">
+            {games.map((game) => {
+              const questionCount = game.questions?.length ?? 0;
+              return (
+                <article key={game.id} className="glass-panel flex flex-col gap-6 p-6">
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Quiz set</p>
+                    <h3 className="text-2xl font-semibold text-white">{game.title}</h3>
+                    {game.description && (
+                      <p className="text-sm text-slate-400 line-clamp-3">{game.description}</p>
+                    )}
                   </div>
-                </div>
 
-                {/* Start Button */}
-                <button
-                  onClick={() => startGameSession(game.id)}
-                  className="w-full py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-2xl hover:from-purple-600 hover:to-pink-600 transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1"
-                >
-                  Start Game Session
-                </button>
+                  <dl className="grid grid-cols-2 gap-3 text-sm text-slate-300">
+                    <div className="rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
+                      <dt className="text-xs uppercase tracking-[0.25em] text-slate-400">Questions</dt>
+                      <dd className="text-xl font-semibold text-white">{questionCount}</dd>
+                    </div>
+                    <div className="rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
+                      <dt className="text-xs uppercase tracking-[0.25em] text-slate-400">Base score</dt>
+                      <dd className="text-xl font-semibold text-white">{game.base_points}</dd>
+                    </div>
+                    <div className="col-span-2 rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
+                      <dt className="text-xs uppercase tracking-[0.25em] text-slate-400">Updated</dt>
+                      <dd className="text-white">{formatDate(game.created_at) || "–"}</dd>
+                    </div>
+                  </dl>
 
-                {/* Edit/Delete buttons */}
-                <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => router.push(`/dashboard/create?edit=${game.id}`)}
-                    className="flex-1 py-2 bg-white/10 border border-white/20 text-white text-sm font-semibold rounded-xl hover:bg-white/20 transition-all duration-200"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={async () => {
-                      const result = await Swal.fire({
-                        title: 'Delete Game?',
-                        text: `Are you sure you want to delete "${game.title}"?`,
-                        icon: 'warning',
-                        showCancelButton: true,
-                        confirmButtonColor: '#ef4444',
-                        cancelButtonColor: '#6b7280',
-                        confirmButtonText: 'Yes, delete it!',
-                      });
-
-                      if (result.isConfirmed) {
-                        const token = getStoredToken();
-                        try {
-                          const response = await fetch(`${API_BASE_URL}/games/${game.id}/`, {
-                            method: 'DELETE',
-                            headers: {
-                              'Authorization': `Token ${token}`,
-                            },
+                  <div className="flex flex-col gap-3">
+                    <button onClick={() => startGameSession(game.id)} className="app-button w-full justify-center">
+                      Launch live session
+                    </button>
+                    <div className="flex gap-2 text-sm">
+                      <button
+                        onClick={() => router.push(`/dashboard/create?edit=${game.id}`)}
+                        className="flex-1 rounded-2xl border border-white/10 px-4 py-2 font-semibold text-slate-200 transition-colors hover:border-white/40"
+                      >
+                        Edit deck
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const confirmed = await Swal.fire({
+                            title: "Delete this game?",
+                            text: `The quiz \"${game.title}\" will be removed.`,
+                            icon: "warning",
+                            showCancelButton: true,
+                            confirmButtonColor: "#ef4444",
+                            background: "#0f172a",
+                            color: "#e2e8f0",
                           });
 
-                          if (response.ok) {
-                            Swal.fire('Deleted!', 'Game has been deleted.', 'success');
-                            fetchGames();
+                          if (confirmed.isConfirmed) {
+                            try {
+                              await fetch(`${API_BASE_URL}/games/${game.id}/`, {
+                                method: "DELETE",
+                                headers: {
+                                  Authorization: `Token ${getStoredToken()}`,
+                                },
+                              });
+                              fetchGames();
+                            } catch (error) {
+                              Swal.fire({
+                                title: "Delete failed",
+                                text: "Please retry in a moment.",
+                                icon: "error",
+                                background: "#0f172a",
+                                color: "#e2e8f0",
+                              });
+                            }
                           }
-                        } catch (error) {
-                          Swal.fire('Error', 'Failed to delete game', 'error');
-                        }
-                      }
-                    }}
-                    className="flex-1 py-2 bg-red-500/20 border border-red-500/50 text-red-300 text-sm font-semibold rounded-xl hover:bg-red-500/30 transition-all duration-200"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
+                        }}
+                        className="flex-1 rounded-2xl border border-red-500/20 px-4 py-2 font-semibold text-red-300 transition-colors hover:border-red-400/60"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </div>

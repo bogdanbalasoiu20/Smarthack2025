@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { getStoredToken } from '@/lib/authToken';
+import React, { useEffect, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+
+import { getStoredToken } from "@/lib/authToken";
 
 type Player = {
   id: number;
@@ -22,16 +23,16 @@ type Question = {
   }>;
 };
 
-type GameState = 'question' | 'score' | 'finished';
+type GameState = "question" | "score" | "finished";
 
-const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000';
+const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8000";
 
 export default function HostControlPage() {
   const router = useRouter();
   const params = useParams();
   const pin = params.pin as string;
 
-  const [gameState, setGameState] = useState<GameState>('question');
+  const [gameState, setGameState] = useState<GameState>("question");
   const [players, setPlayers] = useState<Player[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [answeredCount, setAnsweredCount] = useState(0);
@@ -44,340 +45,297 @@ export default function HostControlPage() {
   useEffect(() => {
     const token = getStoredToken();
     if (!token) {
-      router.replace('/login');
+      router.replace("/login");
       return;
     }
 
-    // Connect to WebSocket with token authentication
     const ws = new WebSocket(`${WS_BASE_URL}/ws/game/${pin}/?token=${token}`);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log('Host WebSocket connected');
       setIsConnected(true);
     };
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      console.log('Host WebSocket message:', data);
 
-      if (data.type === 'question') {
+      if (data.type === "question") {
         const question = data.payload.question;
         const timeLimit = data.payload.time_limit;
 
         setCurrentQuestion(question);
         setTimeLeft(timeLimit);
         setAnsweredCount(0);
-        setGameState('question');
+        setGameState("question");
 
-        // Start countdown timer
+        if (timerRef.current) clearInterval(timerRef.current);
         let remaining = timeLimit;
         timerRef.current = setInterval(() => {
           remaining -= 1;
-          setTimeLeft(remaining);
-          if (remaining <= 0) {
-            if (timerRef.current) clearInterval(timerRef.current);
+          setTimeLeft(Math.max(remaining, 0));
+          if (remaining <= 0 && timerRef.current) {
+            clearInterval(timerRef.current);
           }
         }, 1000);
-      } else if (data.type === 'answered_count') {
+      } else if (data.type === "answered_count") {
         setAnsweredCount(data.payload.count);
-      } else if (data.type === 'score_update') {
+      } else if (data.type === "lobby_update") {
         setPlayers(data.payload.players);
-        setGameState('score');
-        if (timerRef.current) clearInterval(timerRef.current);
-      } else if (data.type === 'end') {
+      } else if (data.type === "score_update") {
         setPlayers(data.payload.players);
-        setGameState('finished');
+        setGameState("score");
         if (timerRef.current) clearInterval(timerRef.current);
-      } else if (data.type === 'lobby_update') {
-        // Ignore lobby updates on host control page
-        console.log('Ignoring lobby_update on host control page');
+      } else if (data.type === "end") {
+        setPlayers(data.payload.players);
+        setGameState("finished");
+        if (timerRef.current) clearInterval(timerRef.current);
       }
     };
 
-    ws.onclose = (event) => {
-      console.log('Host WebSocket disconnected', event.code, event.reason);
+    ws.onclose = () => {
       setIsConnected(false);
     };
 
-    ws.onerror = (error) => {
-      console.error('Host WebSocket error:', error);
-      console.error('WebSocket readyState:', ws.readyState);
-      console.error('WebSocket URL:', ws.url);
+    ws.onerror = () => {
       setIsConnected(false);
     };
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      if (wsRef.current) wsRef.current.close();
+      ws.close();
     };
-  }, [pin]);
+  }, [pin, router]);
 
   const handleNext = () => {
     if (wsRef.current && isConnected) {
-      wsRef.current.send(JSON.stringify({
-        type: 'host_next',
-        payload: {},
-      }));
+      wsRef.current.send(
+        JSON.stringify({
+          type: "host_next",
+          payload: {},
+        })
+      );
     }
   };
 
-  // Question View
-  if (gameState === 'question' && currentQuestion) {
-    const progress = ((currentQuestion.time_limit - timeLeft) / currentQuestion.time_limit) * 100;
-    const answerRate = players.length > 0 ? Math.round((answeredCount / players.length) * 100) : 0;
+  const connectionBadge = (
+    <span
+      className={`inline-flex items-center gap-2 rounded-full border px-4 py-1 text-xs font-semibold tracking-[0.2em] ${
+        isConnected
+          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+          : "border-rose-500/40 bg-rose-500/10 text-rose-200"
+      }`}
+    >
+      <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-400" : "bg-rose-400"} animate-pulse`} />
+      {isConnected ? "Live" : "Disconnected"}
+    </span>
+  );
+
+  const renderQuestionView = () => {
+    if (!currentQuestion) {
+      return (
+        <div className="app-page flex items-center justify-center">
+          <div className="glass-card px-8 py-6 text-slate-300">Waiting for the next question…</div>
+        </div>
+      );
+    }
+
+    const progress =
+      currentQuestion.time_limit > 0
+        ? ((currentQuestion.time_limit - timeLeft) / currentQuestion.time_limit) * 100
+        : 0;
+    const answerRate =
+      players.length > 0 ? Math.round((answeredCount / Math.max(players.length, 1)) * 100) : 0;
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-4xl font-black text-white">Host Control</h1>
-              <p className="text-purple-300">PIN: {pin}</p>
-            </div>
-            <div className={`px-4 py-2 rounded-full text-sm font-semibold ${
-              isConnected ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'
-            }`}>
-              {isConnected ? '● Live' : '● Disconnected'}
+      <div className="game-shell">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="app-pill">Host control</p>
+            <h1 className="text-4xl font-semibold text-white">Question in play</h1>
+            <p className="text-slate-300">PIN {pin}</p>
+          </div>
+          {connectionBadge}
+        </header>
+
+        <div className="game-grid wide-two">
+          <div className="quiz-stat">
+            <h3>Time remaining</h3>
+            <p
+              className={`text-6xl font-semibold ${
+                timeLeft > 10 ? "text-white" : timeLeft > 5 ? "text-yellow-300" : "text-rose-300 animate-pulse"
+              }`}
+            >
+              {timeLeft}s
+            </p>
+            <div className="quiz-progress mt-4">
+              <span style={{ width: `${Math.min(progress, 100)}%` }} />
             </div>
           </div>
 
-          {/* Timer and Progress */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Timer */}
-            <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-8 text-center">
-              <p className="text-purple-300 text-sm font-semibold uppercase tracking-wider mb-2">Time Remaining</p>
-              <div className={`text-8xl font-black mb-4 ${
-                timeLeft > 10 ? 'text-white' : timeLeft > 5 ? 'text-yellow-300' : 'text-red-400 animate-pulse'
-              }`}>
-                {timeLeft}s
-              </div>
-              <div className="w-full bg-white/20 rounded-full h-3 overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-1000 ${
-                    timeLeft > 10 ? 'bg-green-500' : timeLeft > 5 ? 'bg-yellow-500' : 'bg-red-500'
-                  }`}
-                  style={{ width: `${100 - progress}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Answer Stats */}
-            <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-8">
-              <p className="text-purple-300 text-sm font-semibold uppercase tracking-wider mb-2">Answers</p>
-              <div className="flex items-end justify-between mb-4">
-                <div className="text-6xl font-black text-white">{answeredCount}</div>
-                <div className="text-2xl text-purple-300">/ {players.length}</div>
-              </div>
-              <div className="w-full bg-white/20 rounded-full h-3 overflow-hidden mb-2">
-                <div
-                  className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500"
-                  style={{ width: `${answerRate}%` }}
-                />
-              </div>
-              <p className="text-purple-300 text-sm">{answerRate}% of players answered</p>
+          <div className="quiz-stat">
+            <h3>Responses</h3>
+            <p className="text-5xl font-semibold text-white">{answeredCount}</p>
+            <p className="text-sm text-slate-400">out of {players.length || "0"}</p>
+            <div className="quiz-progress mt-4">
+              <span style={{ width: `${answerRate}%` }} />
             </div>
           </div>
+        </div>
 
-          {/* Current Question */}
-          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-8 mb-6">
-            <p className="text-purple-300 text-sm font-semibold uppercase tracking-wider mb-4">Current Question</p>
-            <h2 className="text-4xl font-bold text-white mb-6">{currentQuestion.text}</h2>
-            <div className="grid grid-cols-2 gap-4">
-              {currentQuestion.choices.sort((a, b) => a.order - b.order).map((choice, index) => (
-                <div
-                  key={choice.id}
-                  className="bg-white/10 border-2 border-white/30 rounded-2xl p-6"
-                >
-                  <span className="text-purple-300 font-bold mr-2">Option {index + 1}:</span>
-                  <span className="text-white font-semibold text-lg">{choice.text}</span>
+        <div className="glass-card p-6 space-y-6">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Current question</p>
+            <h2 className="mt-2 text-3xl font-semibold text-white">{currentQuestion.text}</h2>
+          </div>
+          <div className="quiz-answers two">
+            {currentQuestion.choices
+              .slice()
+              .sort((a, b) => a.order - b.order)
+              .map((choice, index) => (
+                <div key={choice.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Option {index + 1}</p>
+                  <p className="mt-2 text-lg font-semibold text-white">{choice.text}</p>
                 </div>
               ))}
-            </div>
           </div>
+        </div>
 
-          {/* Control Buttons */}
-          <div className="flex justify-center gap-4">
-            <button
-              onClick={handleNext}
-              className="px-12 py-4 bg-gradient-to-r from-green-500 to-blue-500 text-white font-black text-xl rounded-2xl hover:scale-105 transition-transform duration-300 shadow-lg"
-            >
-              Show Results →
-            </button>
-          </div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:justify-end">
+          <button
+            onClick={handleNext}
+            className="app-button w-full justify-center sm:w-auto"
+            disabled={!isConnected}
+          >
+            Show results
+          </button>
         </div>
       </div>
     );
-  }
+  };
 
-  // Score View
-  if (gameState === 'score') {
-    const top5 = players.slice(0, 5);
-
+  const renderScoreView = () => {
+    const topFive = players.slice(0, 5);
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-5xl font-black text-white">Leaderboard</h1>
-            <div className="text-purple-300">PIN: {pin}</div>
+      <div className="game-shell">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="app-pill">Host control</p>
+            <h1 className="text-4xl font-semibold text-white">Leaderboard</h1>
+            <p className="text-slate-300">Review the standings before moving on.</p>
           </div>
+          {connectionBadge}
+        </header>
 
-          {/* Top 5 Leaderboard */}
-          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-8 mb-8">
-            <h2 className="text-3xl font-bold text-white mb-6">Top 5 Players</h2>
-            <div className="space-y-4">
-              {top5.map((player, index) => (
-                <div
-                  key={player.id}
-                  className="flex items-center justify-between bg-white/10 border border-white/20 rounded-2xl p-6 hover:bg-white/15 transition-all"
-                >
-                  <div className="flex items-center gap-6">
-                    <div className={`w-16 h-16 flex items-center justify-center rounded-full font-black text-white text-2xl ${
-                      index === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' :
-                      index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-500' :
-                      index === 2 ? 'bg-gradient-to-br from-orange-400 to-orange-600' :
-                      'bg-gradient-to-br from-blue-400 to-blue-600'
-                    }`}>
-                      {index + 1}
-                    </div>
-                    <div>
-                      <p className="text-white font-bold text-2xl">{player.nickname}</p>
-                      {player.streak > 0 && (
-                        <p className="text-orange-300 text-sm font-semibold">
-                          🔥 {player.streak} answer streak
-                        </p>
-                      )}
-                    </div>
+        <div className="glass-card p-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold text-white">Top players</h2>
+            <p className="text-sm text-slate-400">{players.length} total</p>
+          </div>
+          <div className="space-y-4">
+            {topFive.map((player, index) => (
+              <div
+                key={player.id}
+                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-lg font-semibold text-white">
+                    #{index + 1}
                   </div>
-                  <div className="text-white font-black text-3xl">{player.score}</div>
+                  <div>
+                    <p className="text-lg font-semibold text-white">{player.nickname}</p>
+                    {player.streak > 0 && (
+                      <p className="text-xs text-amber-300">🔥 {player.streak} answer streak</p>
+                    )}
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* All Players */}
-          {players.length > 5 && (
-            <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-8 mb-8">
-              <h2 className="text-2xl font-bold text-white mb-4">All Players ({players.length})</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-                {players.map((player, index) => (
-                  <div
-                    key={player.id}
-                    className="flex items-center justify-between bg-white/10 rounded-xl p-4"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-purple-300 font-bold">#{index + 1}</span>
-                      <span className="text-white font-semibold">{player.nickname}</span>
-                    </div>
-                    <span className="text-white font-bold">{player.score}</span>
-                  </div>
-                ))}
+                <p className="text-2xl font-semibold text-white">{player.score}</p>
               </div>
-            </div>
-          )}
-
-          {/* Control Buttons */}
-          <div className="flex justify-center gap-4">
-            <button
-              onClick={handleNext}
-              className="px-12 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-black text-xl rounded-2xl hover:scale-105 transition-transform duration-300 shadow-lg"
-            >
-              Next Question →
-            </button>
+            ))}
           </div>
         </div>
-      </div>
-    );
-  }
 
-  // Finished View
-  if (gameState === 'finished') {
-    const top3 = players.slice(0, 3);
-
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 p-6">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-6xl font-black text-white text-center mb-12">Game Over!</h1>
-
-          {/* Podium */}
-          {top3.length >= 3 && (
-            <div className="flex items-end justify-center gap-6 mb-12">
-              {/* 2nd Place */}
-              <div className="flex-1 max-w-sm">
-                <div className="bg-gradient-to-br from-gray-300 to-gray-500 rounded-t-3xl p-8 text-center">
-                  <div className="text-7xl mb-4">🥈</div>
-                  <p className="text-gray-900 font-black text-3xl mb-2">{top3[1].nickname}</p>
-                  <p className="text-gray-700 font-bold text-4xl">{top3[1].score}</p>
-                </div>
-                <div className="bg-gray-400 h-40 rounded-b-3xl flex items-center justify-center">
-                  <div className="text-gray-900 font-black text-6xl">2</div>
-                </div>
-              </div>
-
-              {/* 1st Place */}
-              <div className="flex-1 max-w-sm">
-                <div className="bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-t-3xl p-10 text-center transform scale-110">
-                  <div className="text-8xl mb-4">👑</div>
-                  <p className="text-yellow-900 font-black text-4xl mb-2">{top3[0].nickname}</p>
-                  <p className="text-yellow-800 font-bold text-5xl">{top3[0].score}</p>
-                </div>
-                <div className="bg-yellow-400 h-56 rounded-b-3xl flex items-center justify-center">
-                  <div className="text-yellow-900 font-black text-7xl">1</div>
-                </div>
-              </div>
-
-              {/* 3rd Place */}
-              <div className="flex-1 max-w-sm">
-                <div className="bg-gradient-to-br from-orange-400 to-orange-600 rounded-t-3xl p-8 text-center">
-                  <div className="text-7xl mb-4">🥉</div>
-                  <p className="text-orange-900 font-black text-3xl mb-2">{top3[2].nickname}</p>
-                  <p className="text-orange-800 font-bold text-4xl">{top3[2].score}</p>
-                </div>
-                <div className="bg-orange-500 h-32 rounded-b-3xl flex items-center justify-center">
-                  <div className="text-orange-900 font-black text-6xl">3</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Final Stats */}
-          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-8 mb-8">
-            <h2 className="text-3xl font-bold text-white mb-4">Final Standings</h2>
-            <div className="space-y-3">
+        {players.length > 5 && (
+          <div className="glass-panel p-6">
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Full list</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
               {players.map((player, index) => (
-                <div
-                  key={player.id}
-                  className="flex items-center justify-between bg-white/10 rounded-xl p-4"
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="text-purple-300 font-bold text-xl">#{index + 1}</span>
-                    <span className="text-white font-semibold text-lg">{player.nickname}</span>
+                <div key={player.id} className="rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm text-white">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">#{index + 1}</span>
+                    <span className="font-semibold">{player.nickname}</span>
+                    <span>{player.score}</span>
                   </div>
-                  <span className="text-white font-bold text-xl">{player.score}</span>
                 </div>
               ))}
             </div>
           </div>
+        )}
 
-          {/* Control Buttons */}
-          <div className="flex justify-center gap-4">
-            <button
-              onClick={() => router.push('/game/host')}
-              className="px-12 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-black text-xl rounded-2xl hover:scale-105 transition-transform duration-300 shadow-lg"
-            >
-              Back to Games
-            </button>
-          </div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:justify-end">
+          <button onClick={handleNext} className="app-button w-full justify-center sm:w-auto">
+            Next question
+          </button>
         </div>
       </div>
     );
-  }
+  };
+
+  const renderFinishedView = () => {
+    const topThree = players.slice(0, 3);
+    return (
+      <div className="game-shell">
+        <header className="text-center space-y-2">
+          <p className="app-pill mx-auto">Host control</p>
+          <h1 className="text-4xl font-semibold text-white">Game finished</h1>
+          <p className="text-slate-300">Celebrate the podium and wrap the session.</p>
+        </header>
+
+        {topThree.length === 3 && (
+          <div className="glass-card p-6">
+            <div className="grid gap-4 md:grid-cols-3">
+              {topThree.map((player, index) => (
+                <div key={player.id} className="rounded-3xl border border-white/10 bg-white/5 p-6 text-center">
+                  <p className="text-sm uppercase tracking-[0.3em] text-slate-400">Place {index + 1}</p>
+                  <p className="mt-2 text-2xl font-semibold text-white">{player.nickname}</p>
+                  <p className="text-3xl font-bold text-white">{player.score}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="glass-panel p-6">
+          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Final standings</p>
+          <div className="mt-4 space-y-3">
+            {players.map((player, index) => (
+              <div key={player.id} className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
+                <span className="text-slate-400">#{index + 1}</span>
+                <span className="text-white font-semibold">{player.nickname}</span>
+                <span className="text-white font-semibold">{player.score}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
+          <button onClick={() => router.push("/game/host")} className="app-button w-full justify-center sm:w-auto">
+            Back to games
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 flex items-center justify-center">
-      <div className="text-white text-2xl">Connecting...</div>
+    <div className="app-page">
+      {gameState === "question" && renderQuestionView()}
+      {gameState === "score" && renderScoreView()}
+      {gameState === "finished" && renderFinishedView()}
+      {!["question", "score", "finished"].includes(gameState) && (
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <div className="text-slate-400">Synchronizing…</div>
+        </div>
+      )}
     </div>
   );
 }

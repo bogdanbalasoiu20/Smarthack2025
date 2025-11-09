@@ -1,138 +1,98 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function GameJoinPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const urlPin = searchParams.get('pin') || '';
+  const initialPin = searchParams.get("pin") || "";
 
-  const [nickname, setNickname] = useState('');
-  const [pin, setPin] = useState(urlPin);
+  const [nickname, setNickname] = useState("");
+  const [pin, setPin] = useState(initialPin);
   const [joining, setJoining] = useState(false);
 
-  const handleJoin = async () => {
-    if (!nickname.trim() || !pin.trim()) {
-      return;
+  useEffect(() => {
+    if (initialPin) {
+      setPin(initialPin);
     }
+  }, [initialPin]);
 
+  const handleJoin = () => {
+    if (!nickname.trim() || !pin.trim()) return;
     setJoining(true);
-    // Navigate to player lobby
     router.push(`/game/play/${pin}?nickname=${encodeURIComponent(nickname.trim())}`);
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && nickname.trim() && pin.trim()) {
+  const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" && nickname.trim() && pin.trim()) {
       handleJoin();
     }
   };
 
+  const disabled = !nickname.trim() || !pin.trim() || joining;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center py-12 px-4">
-      <div className="max-w-2xl w-full">
-        {/* Logo/Title */}
-        <div className="text-center mb-12">
-          <div className="text-8xl font-black text-white mb-4" style={{
-            textShadow: '0 0 60px rgba(255,255,255,0.6)',
-            background: 'linear-gradient(135deg, #fff 0%, #a78bfa 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}>
-            KAHOOT!
-          </div>
-          <p className="text-2xl text-purple-200 font-semibold">Join the game</p>
-        </div>
+    <div className="app-page">
+      <div className="game-shell items-center">
+        <header className="text-center space-y-3">
+          <p className="app-pill">Join live quiz</p>
+          <h1 className="text-4xl font-semibold text-white">Jump into the session</h1>
+          <p className="text-slate-300">Enter the PIN from the host and pick a nickname that classmates will spot.</p>
+        </header>
 
-        {/* Join Form */}
-        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-8 sm:p-12 shadow-2xl">
-          <div className="space-y-6">
-            {/* PIN Input */}
-            <div>
-              <label className="block text-sm font-bold text-purple-200 uppercase tracking-widest mb-3">
-                Game PIN
-              </label>
+        <div className="glass-card w-full max-w-3xl p-8 sm:p-12 space-y-8">
+          <div className="grid gap-6 md:grid-cols-2">
+            <label className="space-y-3">
+              <span className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Game PIN</span>
               <input
-                type="text"
                 value={pin}
-                onChange={(e) => setPin(e.target.value.trim())}
-                onKeyPress={handleKeyPress}
-                placeholder="Enter game PIN"
+                onChange={(event) => setPin(event.target.value.trim())}
+                onKeyDown={handleKeyPress}
                 maxLength={6}
-                className="w-full px-6 py-5 bg-white/10 border-2 border-white/30 rounded-2xl text-white text-3xl text-center font-bold tracking-[0.3em] placeholder-white/30 focus:outline-none focus:border-purple-400 focus:bg-white/20 transition-all duration-200"
-                style={{ fontFamily: '"Courier New", monospace' }}
+                placeholder="123456"
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-center text-3xl font-semibold tracking-[0.35em] text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none"
               />
-            </div>
+            </label>
 
-            {/* Nickname Input */}
-            <div>
-              <label className="block text-sm font-bold text-purple-200 uppercase tracking-widest mb-3">
-                Your Nickname
-              </label>
+            <label className="space-y-3">
+              <span className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Nickname</span>
               <input
-                type="text"
                 value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Enter your name"
+                onChange={(event) => setNickname(event.target.value)}
+                onKeyDown={handleKeyPress}
                 maxLength={20}
-                className="w-full px-6 py-5 bg-white/10 border-2 border-white/30 rounded-2xl text-white text-2xl placeholder-white/30 focus:outline-none focus:border-purple-400 focus:bg-white/20 transition-all duration-200"
+                placeholder="Pick something fun"
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-lg text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none"
               />
-              <p className="text-purple-300 text-sm mt-2">
-                {nickname.length}/20 characters
-              </p>
-            </div>
-
-            {/* Join Button */}
-            <button
-              onClick={handleJoin}
-              disabled={!nickname.trim() || !pin.trim() || joining}
-              className={`w-full py-6 rounded-2xl text-2xl font-black transition-all duration-300 transform ${
-                nickname.trim() && pin.trim() && !joining
-                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:scale-105 hover:shadow-2xl shadow-lg cursor-pointer'
-                  : 'bg-gray-500/50 text-gray-300 cursor-not-allowed'
-              }`}
-              style={{
-                boxShadow: nickname.trim() && pin.trim() && !joining ? '0 20px 60px rgba(168, 85, 247, 0.4)' : 'none',
-              }}
-            >
-              {joining ? 'JOINING...' : 'JOIN GAME'}
-            </button>
+              <p className="text-xs text-slate-500">{nickname.length}/20 characters</p>
+            </label>
           </div>
+
+          <button
+            onClick={handleJoin}
+            disabled={disabled}
+            className={`app-button w-full justify-center text-base ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+          >
+            {joining ? "Connecting…" : "Join game"}
+          </button>
         </div>
 
-        {/* Quick Tips */}
-        <div className="mt-8 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
-          <h3 className="text-white font-bold text-lg mb-3">Quick Tips:</h3>
-          <ul className="text-purple-200 space-y-2 text-sm">
-            <li className="flex items-start">
-              <span className="text-purple-400 mr-2">•</span>
-              <span>Get the game PIN from your teacher or host</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-purple-400 mr-2">•</span>
-              <span>Choose a fun nickname that others will recognize</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-purple-400 mr-2">•</span>
-              <span>Make sure you have a stable internet connection</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-purple-400 mr-2">•</span>
-              <span>Answer quickly to earn more points!</span>
-            </li>
+        <div className="glass-panel w-full max-w-3xl p-6 text-sm text-slate-300 space-y-3">
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Quick tips</p>
+          <ul className="space-y-1">
+            <li>• Keep the tab active, the host controls pacing.</li>
+            <li>• Fast answers = more points. Trust your instincts.</li>
+            <li>• Stable Wi‑Fi helps you keep streaks alive.</li>
           </ul>
         </div>
 
-        {/* Back Button */}
-        <div className="text-center mt-8">
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="text-purple-300 hover:text-white underline transition-colors"
-          >
-            Back to Dashboard
-          </button>
-        </div>
+        <button
+          onClick={() => router.push("/dashboard")}
+          className="text-sm font-semibold text-slate-400 underline-offset-4 transition-colors hover:text-white"
+        >
+          Back to dashboard
+        </button>
       </div>
     </div>
   );
