@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -174,3 +175,6 @@ REST_FRAMEWORK = {
 
 
 CORS_ALLOW_CREDENTIALS = True
+
+# AI Configuration
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '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')

@@ -11,6 +11,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!/frontend/lib/
 lib64/
 parts/
 sdist/
@@ -22,6 +23,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+settings.py
 
 # Django / databases
 *.log

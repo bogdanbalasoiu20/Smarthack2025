@@ -83,12 +83,18 @@ class PresentationConsumer(AsyncWebsocketConsumer):
                     }))
                     return
 
+            message_payload = {
+                **data,
+                'user_id': self.user.id,
+                'username': self.user.username,
+            }
+
             # Broadcast la toți membrii grupului
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     'type': 'broadcast_message',
-                    'message': data,
+                    'message': message_payload,
                     'sender_id': self.user.id,
                     'sender_username': self.user.username,
                 }

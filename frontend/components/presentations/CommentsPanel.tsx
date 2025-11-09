@@ -1,9 +1,10 @@
-'use client';
+ 'use client';
 
 import { useState, useEffect } from 'react';
-import { Send, Check } from 'lucide-react';
+import { Send, Check, MessageCircle } from 'lucide-react';
 import { usePresentation } from '@/contexts/PresentationContext';
 import { getStoredToken } from '@/lib/authToken';
+import { API_BASE_URL } from '@/lib/api';
 
 interface Comment {
   id: number;
@@ -14,6 +15,7 @@ interface Comment {
   };
   is_resolved: boolean;
   created_at: string;
+  frame: number | null;
 }
 
 export default function CommentsPanel() {
@@ -32,7 +34,7 @@ export default function CommentsPanel() {
     try {
       const token = getStoredToken();
       const response = await fetch(
-        `http://localhost:8000/api/comments/?presentation=${presentation?.id}`,
+        `${API_BASE_URL}/comments/?presentation=${presentation?.id}`,
         {
           headers: {
             Authorization: `Token ${token}`,
@@ -55,7 +57,7 @@ export default function CommentsPanel() {
     setLoading(true);
     try {
       const token = getStoredToken();
-      const response = await fetch('http://localhost:8000/api/comments/', {
+      const response = await fetch(`${API_BASE_URL}/comments/`, {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,
@@ -82,15 +84,12 @@ export default function CommentsPanel() {
   const handleResolve = async (commentId: number) => {
     try {
       const token = getStoredToken();
-      await fetch(
-        `http://localhost:8000/api/comments/${commentId}/resolve/`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Token ${token}`,
-          },
-        }
-      );
+      await fetch(`${API_BASE_URL}/comments/${commentId}/resolve/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${token}`,
+        },
+      });
       fetchComments();
     } catch (error) {
       console.error('Error resolving comment:', error);
@@ -98,54 +97,62 @@ export default function CommentsPanel() {
   };
 
   const frameComments = selectedFrame
-    ? comments.filter((c) => c.id === selectedFrame.id)
+    ? comments.filter((c) => c.frame === selectedFrame.id || !c.frame)
     : comments;
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-gray-200">
-        <h3 className="font-semibold text-gray-900">Comentarii</h3>
-        <p className="text-xs text-gray-500 mt-1">
-          {selectedFrame ? `Frame: ${selectedFrame.title}` : 'Toate comentariile'}
-        </p>
+    <div className="flex h-full flex-col text-white">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.3em] text-white/50">Feedback</p>
+          <h3 className="text-lg font-semibold text-white">Comments</h3>
+          <p className="text-xs text-white/50">
+            {selectedFrame ? `Frame: ${selectedFrame.title}` : 'All frames'}
+          </p>
+        </div>
+        <div className="rounded-full border border-white/10 p-2 text-white/70">
+          <MessageCircle size={18} />
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {frameComments.length === 0 ? (
-          <div className="text-center py-8 text-sm text-gray-500">
-            Niciun comentariu
+          <div className="rounded-3xl border border-dashed border-white/15 bg-white/5 p-6 text-center text-sm text-white/60">
+            No comments yet. Start the conversation!
           </div>
         ) : (
           frameComments.map((comment) => (
             <div
               key={comment.id}
-              className={`p-3 rounded-lg border ${
+              className={`rounded-2xl border p-3 text-sm shadow-inner ${
                 comment.is_resolved
-                  ? 'bg-green-50 border-green-200'
-                  : 'bg-gray-50 border-gray-200'
+                  ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-50'
+                  : 'border-white/10 bg-white/5 text-white'
               }`}
             >
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-sm font-medium text-gray-900">
-                  {comment.author.username}
-                </span>
+              <div className="mb-2 flex items-start justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-white/60">
+                    {comment.author.username}
+                  </p>
+                  <p className="text-[10px] text-white/40">
+                    {new Date(comment.created_at).toLocaleString()}
+                  </p>
+                </div>
                 {!comment.is_resolved && (
                   <button
                     onClick={() => handleResolve(comment.id)}
-                    className="p-1 hover:bg-green-100 rounded"
+                    className="rounded-full border border-emerald-400/40 p-1 text-emerald-200 transition hover:bg-emerald-500/20 hover:text-white"
                     title="Mark as resolved"
                   >
-                    <Check size={14} className="text-green-600" />
+                    <Check size={14} />
                   </button>
                 )}
               </div>
-              <p className="text-sm text-gray-700">{comment.text}</p>
-              <p className="text-xs text-gray-500 mt-2">
-                {new Date(comment.created_at).toLocaleString('ro-RO')}
-              </p>
+              <p>{comment.text}</p>
               {comment.is_resolved && (
-                <span className="inline-block mt-2 text-xs bg-green-200 text-green-800 px-2 py-1 rounded">
-                  Rezolvat
+                <span className="mt-2 inline-block rounded-full bg-emerald-500/30 px-3 py-1 text-[10px] uppercase tracking-wide text-emerald-100">
+                  Resolved
                 </span>
               )}
             </div>
@@ -153,20 +160,20 @@ export default function CommentsPanel() {
         )}
       </div>
 
-      <div className="p-4 border-t border-gray-200">
+      <div className="border-t border-white/10 px-4 py-4">
         <div className="flex gap-2">
           <input
             type="text"
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
-            placeholder="Adaugă comentariu..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
+            placeholder="Leave a comment..."
+            className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder:text-white/40 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
           />
           <button
             onClick={handleAddComment}
             disabled={loading || !newComment.trim()}
-            className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-2 text-white shadow-lg shadow-indigo-500/30 transition hover:shadow-indigo-500/50 disabled:opacity-40"
           >
             <Send size={16} />
           </button>

@@ -1,9 +1,9 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import type { CSSProperties } from 'react';
 import { usePresentation } from '@/contexts/PresentationContext';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 type ResizeHandle = 'nw' | 'ne' | 'sw' | 'se';
 
@@ -30,6 +30,21 @@ type ResizeState = DragState & {
 const MIN_ELEMENT_SIZE = 40;
 const RESIZE_HANDLES: ResizeHandle[] = ['nw', 'ne', 'sw', 'se'];
 
+type ElementAnimationSettings = {
+  type: 'fade' | 'slide' | 'zoom' | 'bounce';
+  direction?: 'left' | 'right' | 'up' | 'down' | 'none';
+  duration: number;
+  delay: number;
+  easing: string;
+};
+
+type FrameTransitionSettings = {
+  type: 'none' | 'fade' | 'slide' | 'zoom' | 'spin';
+  direction?: 'left' | 'right' | 'up' | 'down' | 'none';
+  duration: number;
+  delay: number;
+};
+
 const HANDLE_STYLE_MAP: Record<ResizeHandle, CSSProperties> = {
   nw: { top: -6, left: -6, cursor: 'nwse-resize' },
   ne: { top: -6, right: -6, cursor: 'nesw-resize' },
@@ -38,6 +53,22 @@ const HANDLE_STYLE_MAP: Record<ResizeHandle, CSSProperties> = {
 };
 
 const clampSize = (value: number) => Math.max(MIN_ELEMENT_SIZE, value);
+const GRID_PATTERN =
+  'linear-gradient(0deg, rgba(148,163,184,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.08) 1px, transparent 1px)';
+const GRID_SIZE = 32;
+const DEFAULT_ELEMENT_ANIMATION: ElementAnimationSettings = {
+  type: 'fade',
+  direction: 'up',
+  duration: 0.8,
+  delay: 0,
+  easing: 'easeInOut',
+};
+const DEFAULT_FRAME_TRANSITION: FrameTransitionSettings = {
+  type: 'fade',
+  direction: 'none',
+  duration: 0.6,
+  delay: 0,
+};
 
 const getResizedPosition = (
   handle: ResizeHandle,
@@ -97,6 +128,8 @@ export default function CanvasEditor() {
     updateElement,
     createElement,
     canEdit,
+    remoteUsers,
+    announceSelection,
   } = usePresentation();
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -110,6 +143,11 @@ export default function CanvasEditor() {
   const [isResizing, setIsResizing] = useState(false);
   const [activeHandle, setActiveHandle] = useState<ResizeHandle | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const playedAnimationsRef = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    playedAnimationsRef.current.clear();
+  }, [selectedFrame?.id]);
 
   // Zoom cu scroll
   const handleWheel = (e: React.WheelEvent) => {
@@ -372,129 +410,234 @@ export default function CanvasEditor() {
     }
   };
 
+const frameObservers = useMemo(() => {
+    if (!selectedFrame) {
+      return [];
+    }
+    return remoteUsers.filter((u) => u.frameId === selectedFrame.id && !u.elementId);
+  }, [remoteUsers, selectedFrame?.id]);
+
+  const handleCanvasBackgroundClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (e.target === e.currentTarget) {
+        setSelectedElement(null);
+        announceSelection(selectedFrame?.id ?? null, null);
+      }
+    },
+    [announceSelection, selectedFrame?.id, setSelectedElement]
+  );
+
   if (!selectedFrame) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-gray-500">
-        Selectează un cadru pentru a edita
+      <div className="w-full h-full flex items-center justify-center text-gray-400">
+        Select a frame from the sidebar to start editing
       </div>
     );
   }
 
   const framePos = selectedFrame.position_parsed;
+  const frameTransitionSettings =
+    selectedFrame.transition_settings_parsed || DEFAULT_FRAME_TRANSITION;
+  const frameVariants = getFrameTransitionVariants(frameTransitionSettings);
 
   return (
-    <div
-      ref={canvasRef}
-      className={`w-full h-full overflow-hidden bg-gray-200 relative cursor-move ${
-        isDragOver ? 'ring-4 ring-blue-400 ring-inset' : ''
-      }`}
-      onWheel={handleWheel}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      {/* Canvas transformabil */}
+    <div className="relative h-full w-full">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.2),_transparent_45%),radial-gradient(circle_at_bottom,_rgba(14,165,233,0.15),_transparent_45%)]" />
       <div
+        ref={canvasRef}
+        className="relative h-full w-full overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/60 shadow-[0_40px_120px_rgba(2,6,23,0.65)] backdrop-blur-2xl"
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          transformOrigin: '0 0',
-          position: 'absolute',
-          left: 0,
-          top: 0,
+          boxShadow: isDragOver
+            ? '0 0 0 2px rgba(99,102,241,0.45), 0 35px 90px rgba(2,6,23,0.65)'
+            : '0 35px 90px rgba(2,6,23,0.55)',
         }}
       >
-        {/* Frame vizibil */}
         <div
-          className="shadow-lg relative"
+          className="absolute inset-3 rounded-3xl border border-white/5 bg-slate-900/50 shadow-inner"
           style={{
-            width: `${framePos.width}px`,
-            height: `${framePos.height}px`,
-            backgroundColor: selectedFrame.background_color,
-            backgroundImage: selectedFrame.background_image
-              ? `url(${selectedFrame.background_image})`
-              : undefined,
-            backgroundSize: 'cover',
-            transform: `rotate(${framePos.rotation}deg)`,
+            backgroundImage: GRID_PATTERN,
+            backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
           }}
-        >
-          {/* Elemente în frame */}
-          {selectedFrame.elements?.map((element) => {
-            const elPos = element.position_parsed;
-            const content = element.content_parsed;
+        />
 
-            return (
-              <motion.div
-                key={element.id}
-                className={`absolute cursor-pointer ${
-                  selectedElement?.id === element.id
-                    ? 'ring-2 ring-blue-500'
-                    : 'hover:ring-1 hover:ring-blue-300'
-                }`}
-                style={{
-                  left: `${elPos.x}px`,
-                  top: `${elPos.y}px`,
-                  width: `${elPos.width}px`,
-                  height: `${elPos.height}px`,
-                  transform: `rotate(${elPos.rotation}deg)`,
-                  zIndex: elPos.z_index,
-                }}
-                onMouseDown={(e) => startDragElement(e, element)}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedElement(element);
-                }}
-              >
-                {renderElement(element)}
-                {selectedElement?.id === element.id && canEdit && (
-                  <>
-                    {RESIZE_HANDLES.map((handle) => (
-                      <span
-                        key={handle}
-                        className={`absolute w-3 h-3 rounded-full border border-blue-500 bg-white shadow ${
-                          activeHandle === handle ? 'bg-blue-500' : ''
-                        }`}
-                        style={HANDLE_STYLE_MAP[handle]}
-                        onMouseDown={(resizeEvent) =>
-                          startResizeElement(resizeEvent, element, handle)
-                        }
-                      />
+        <div
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: '0 0',
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            cursor: isPanning ? 'grabbing' : isDragging ? 'grabbing' : 'default',
+          }}
+          onClick={handleCanvasBackgroundClick}
+        >
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={selectedFrame.id}
+              initial={frameVariants.initial}
+              animate={frameVariants.animate}
+              exit={frameVariants.exit}
+              transition={{
+                duration: frameTransitionSettings.duration ?? DEFAULT_FRAME_TRANSITION.duration,
+                delay: frameTransitionSettings.delay ?? DEFAULT_FRAME_TRANSITION.delay,
+                ease: 'easeInOut',
+              }}
+              style={{ display: 'inline-block' }}
+            >
+              <div
+                className="relative shadow-[0_30px_60px_rgba(2,6,23,0.45)]"
+              style={{
+                width: `${framePos.width}px`,
+                height: `${framePos.height}px`,
+                backgroundColor: selectedFrame.background_color,
+                backgroundImage: selectedFrame.background_image
+                  ? `url(${selectedFrame.background_image})`
+                  : undefined,
+                backgroundSize: 'cover',
+                transform: `rotate(${framePos.rotation}deg)`,
+                borderRadius: '32px',
+                border: '1px solid rgba(255,255,255,0.08)',
+                overflow: 'hidden',
+              }}
+            >
+                {frameObservers.length > 0 && (
+                  <div className="absolute right-4 top-4 flex flex-wrap gap-2">
+                    {frameObservers.map((observer) => (
+                      <div
+                        key={observer.userId}
+                        className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow"
+                        style={{ backgroundColor: observer.color }}
+                      >
+                        {observer.username}
+                      </div>
                     ))}
-                  </>
+                  </div>
                 )}
-              </motion.div>
-            );
-          })}
-        </div>
-      </div>
+                {selectedFrame.elements?.map((element) => {
+                  const elPos = element.position_parsed;
+                  const animationSettings: ElementAnimationSettings =
+                    element.animation_settings_parsed || DEFAULT_ELEMENT_ANIMATION;
+                  const elementVariants = getElementAnimationVariants(animationSettings);
+                  const hasPlayed = playedAnimationsRef.current.has(element.id);
+                  const remoteSelectors = remoteUsers.filter(
+                    (user) => user.elementId === element.id
+                  );
+                  const borderHighlight =
+                    remoteSelectors.length > 0 ? remoteSelectors[0].color : undefined;
 
-      {/* Zoom controls */}
-      <div className="absolute bottom-4 right-4 bg-white rounded-lg shadow-lg p-2 flex gap-2">
-        <button
-          onClick={() => setZoom((z) => Math.max(z - 0.1, 0.1))}
-          className="px-3 py-1 hover:bg-gray-100 rounded"
-        >
-          -
-        </button>
-        <span className="px-3 py-1">{Math.round(zoom * 100)}%</span>
-        <button
-          onClick={() => setZoom((z) => Math.min(z + 0.1, 5))}
-          className="px-3 py-1 hover:bg-gray-100 rounded"
-        >
-          +
-        </button>
-        <button
-          onClick={() => {
-            setZoom(1);
-            setPan({ x: 0, y: 0 });
-          }}
-          className="px-3 py-1 hover:bg-gray-100 rounded ml-2"
-        >
-          Reset
-        </button>
+                  return (
+                    <motion.div
+                      key={element.id}
+                      className={`absolute cursor-pointer ${
+                        selectedElement?.id === element.id
+                          ? 'ring-2 ring-blue-500'
+                          : 'hover:ring-1 hover:ring-blue-300'
+                      }`}
+                      style={{
+                        left: `${elPos.x}px`,
+                        top: `${elPos.y}px`,
+                        width: `${elPos.width}px`,
+                        height: `${elPos.height}px`,
+                        transform: `rotate(${elPos.rotation}deg)`,
+                        zIndex: elPos.z_index,
+                        boxShadow: borderHighlight ? `0 0 0 2px ${borderHighlight}` : undefined,
+                      }}
+                      initial={hasPlayed ? elementVariants.animate : elementVariants.initial}
+                      animate={elementVariants.animate}
+                      transition={{
+                        duration: animationSettings.duration,
+                        delay: animationSettings.delay,
+                        ease: animationSettings.easing,
+                      }}
+                      onAnimationComplete={() => {
+                        playedAnimationsRef.current.add(element.id);
+                      }}
+                      onMouseDown={(e) => startDragElement(e, element)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedElement(element);
+                        announceSelection(selectedFrame.id, element.id);
+                      }}
+                    >
+                      {renderElement(element)}
+                      {remoteSelectors.length > 0 && (
+                        <div className="absolute -top-6 left-0 flex flex-wrap gap-1">
+                          {remoteSelectors.map((user) => (
+                            <div
+                              key={user.userId}
+                              className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow"
+                              style={{ backgroundColor: user.color }}
+                            >
+                              {user.username}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {selectedElement?.id === element.id && canEdit && (
+                        <>
+                          {RESIZE_HANDLES.map((handle) => (
+                            <span
+                              key={handle}
+                              className={`absolute w-3 h-3 rounded-full border border-blue-500 bg-white shadow ${
+                                activeHandle === handle ? 'bg-blue-500' : ''
+                              }`}
+                              style={HANDLE_STYLE_MAP[handle]}
+                              onMouseDown={(resizeEvent) =>
+                                startResizeElement(resizeEvent, element, handle)
+                              }
+                            />
+                          ))}
+                        </>
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {isDragOver && (
+          <div className="pointer-events-none absolute inset-6 rounded-[26px] border-2 border-dashed border-indigo-400/80 bg-indigo-500/10" />
+        )}
+
+        <div className="absolute inset-x-8 bottom-6 flex items-center justify-center">
+          <div className="flex items-center gap-3 rounded-full border border-white/10 bg-slate-900/70 px-4 py-2 text-white/80 shadow-2xl backdrop-blur">
+            <button
+              onClick={() => setZoom((z) => Math.max(z - 0.1, 0.1))}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg font-semibold text-white transition hover:bg-white/30"
+          >
+            -
+          </button>
+            <span className="min-w-[4rem] text-center font-semibold tracking-wide">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              onClick={() => setZoom((z) => Math.min(z + 0.1, 5))}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg font-semibold text-white transition hover:bg-white/30"
+            >
+              +
+            </button>
+            <div className="h-6 w-px bg-white/20" />
+            <button
+              onClick={() => {
+                setZoom(1);
+                setPan({ x: 0, y: 0 });
+              }}
+              className="rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-lg shadow-indigo-500/40 transition hover:shadow-indigo-500/60"
+            >
+              Reset view
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -574,4 +717,84 @@ function renderElement(element: any) {
         </div>
       );
   }
+}
+
+function getDirectionOffset(direction: string | undefined, distance = 120) {
+  switch (direction) {
+    case 'left':
+      return { x: distance * -1, y: 0 };
+    case 'right':
+      return { x: distance, y: 0 };
+    case 'down':
+      return { x: 0, y: distance };
+    case 'up':
+      return { x: 0, y: distance * -1 };
+    default:
+      return { x: 0, y: 0 };
+  }
+}
+
+function getElementAnimationVariants(settings: ElementAnimationSettings) {
+  const base = {
+    initial: { opacity: 0, x: 0, y: 0, scale: 1, rotate: 0 },
+    animate: { opacity: 1, x: 0, y: 0, scale: 1, rotate: 0 },
+  };
+
+  switch (settings.type) {
+    case 'slide': {
+      const offset = getDirectionOffset(settings.direction, 140);
+      base.initial = { ...base.initial, ...offset };
+      break;
+    }
+    case 'zoom':
+      base.initial = { ...base.initial, scale: 0.85 };
+      break;
+    case 'bounce':
+      base.initial = { ...base.initial, scale: 0.9 };
+      base.animate = { ...base.animate, scale: [1.05, 0.97, 1] };
+      break;
+    case 'fade':
+    default:
+      base.initial = {
+        ...base.initial,
+        y: settings.direction === 'up' ? -40 : settings.direction === 'down' ? 40 : 0,
+      };
+      break;
+  }
+
+  return base;
+}
+
+function getFrameTransitionVariants(settings: FrameTransitionSettings) {
+  const animate = { opacity: 1, x: 0, y: 0, scale: 1, rotate: 0 };
+  let initial = { opacity: 0, x: 0, y: 0, scale: 1, rotate: 0 };
+  let exit = { opacity: 0, x: 0, y: 0, scale: 0.98, rotate: 0 };
+
+  switch (settings.type) {
+    case 'slide': {
+      const offset = getDirectionOffset(settings.direction, 200);
+      initial = { opacity: 0, ...offset, scale: 0.98, rotate: 0 };
+      exit = { opacity: 0, ...offset, scale: 0.98, rotate: 0 };
+      break;
+    }
+    case 'zoom':
+      initial = { opacity: 0, scale: 0.85, x: 0, y: 0, rotate: 0 };
+      exit = { opacity: 0, scale: 1.1, x: 0, y: 0, rotate: 0 };
+      break;
+    case 'spin':
+      initial = { opacity: 0, scale: 0.9, rotate: -15, x: 0, y: 0 };
+      exit = { opacity: 0, scale: 0.9, rotate: 15, x: 0, y: 0 };
+      break;
+    case 'fade':
+      initial = { opacity: 0, x: 0, y: 20, scale: 1, rotate: 0 };
+      exit = { opacity: 0, x: 0, y: -20, scale: 1, rotate: 0 };
+      break;
+    case 'none':
+    default:
+      initial = { opacity: 1, x: 0, y: 0, scale: 1, rotate: 0 };
+      exit = { opacity: 1, x: 0, y: 0, scale: 1, rotate: 0 };
+      break;
+  }
+
+  return { initial, animate, exit };
 }

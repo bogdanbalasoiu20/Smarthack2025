@@ -1,48 +1,82 @@
-'use client';
+"use client";
 
 import { useState } from 'react';
-import { Sparkles, Loader2 } from 'lucide-react';
+import Swal from 'sweetalert2';
+import { Sparkles, Loader2, Lightbulb, CheckCircle, AlertCircle } from 'lucide-react';
 import { usePresentation } from '@/contexts/PresentationContext';
 import { getStoredToken } from '@/lib/authToken';
+import { API_BASE_URL } from '@/lib/api';
 
 export default function AIPanel() {
   const { presentation, createElement, selectedFrame, canEdit } = usePresentation();
-  const [activeTab, setActiveTab] = useState<'generate' | 'rewrite' | 'suggest'>('generate');
+  const [activeTab, setActiveTab] = useState<'advice' | 'rewrite' | 'suggest'>('advice');
   const [loading, setLoading] = useState(false);
 
-  // Generate Presentation
-  const [generateForm, setGenerateForm] = useState({
-    title: '',
-    purpose: '',
-    audience: '',
-    duration: 10,
-  });
+  // Advice tab state
+  const [advice, setAdvice] = useState<any>(null);
 
-  const handleGenerate = async () => {
+  const handleGetAdvice = async () => {
+    if (!selectedFrame) {
+      Swal.fire({
+        icon: 'info',
+        title: 'Select a frame',
+        text: 'Please select a frame to get AI advice on it.',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const token = getStoredToken();
-      const response = await fetch('http://localhost:8000/api/presentations/ai/generate/', {
+
+      // Collect all text content from the frame
+      const slideContent = selectedFrame.elements
+        .filter((el: any) => el.element_type === 'TEXT')
+        .map((el: any) => el.content?.text || '')
+        .join('\n');
+
+      if (!slideContent.trim()) {
+        Swal.fire({
+          icon: 'info',
+          title: 'No content',
+          text: 'This slide has no text content to analyze.',
+        });
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/ai/slide-advice/`, {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(generateForm),
+        body: JSON.stringify({
+          slide_content: slideContent,
+          context: presentation?.title || '',
+        }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        alert(`AI a generat ${data.frames.length} frames! (Mock response)`);
+        setAdvice(data);
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to get advice');
       }
-    } catch (error) {
-      console.error('Error generating presentation:', error);
+    } catch (error: any) {
+      console.error('Error getting advice:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.message || 'Failed to get AI advice',
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  // Rewrite Text
+  // Rewrite tab state
   const [rewriteText, setRewriteText] = useState('');
   const [rewriteMode, setRewriteMode] = useState('professional');
   const [rewrittenText, setRewrittenText] = useState('');
@@ -51,7 +85,7 @@ export default function AIPanel() {
     setLoading(true);
     try {
       const token = getStoredToken();
-      const response = await fetch('http://localhost:8000/api/presentations/ai/rewrite/', {
+      const response = await fetch(`${API_BASE_URL}/ai/rewrite/`, {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,
@@ -66,15 +100,23 @@ export default function AIPanel() {
       if (response.ok) {
         const data = await response.json();
         setRewrittenText(data.rewritten);
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to rewrite');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error rewriting text:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.message || 'Failed to rewrite text',
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  // Suggest Visuals
+  // Suggest tab state
   const [suggestText, setSuggestText] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
 
@@ -82,7 +124,7 @@ export default function AIPanel() {
     setLoading(true);
     try {
       const token = getStoredToken();
-      const response = await fetch('http://localhost:8000/api/presentations/ai/suggest-visuals/', {
+      const response = await fetch(`${API_BASE_URL}/ai/suggest-visuals/`, {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,
@@ -96,217 +138,244 @@ export default function AIPanel() {
       if (response.ok) {
         const data = await response.json();
         setSuggestions(data.suggestions);
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to get suggestions');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error suggesting visuals:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.message || 'Failed to suggest visuals',
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200 p-2">
-        <button
-          onClick={() => setActiveTab('generate')}
-          className={`flex-1 px-3 py-2 text-xs font-medium rounded ${
-            activeTab === 'generate' ? 'bg-purple-100 text-purple-700' : 'text-gray-600'
-          }`}
-        >
-          Generate
-        </button>
-        <button
-          onClick={() => setActiveTab('rewrite')}
-          className={`flex-1 px-3 py-2 text-xs font-medium rounded ${
-            activeTab === 'rewrite' ? 'bg-purple-100 text-purple-700' : 'text-gray-600'
-          }`}
-        >
-          Rewrite
-        </button>
-        <button
-          onClick={() => setActiveTab('suggest')}
-          className={`flex-1 px-3 py-2 text-xs font-medium rounded ${
-            activeTab === 'suggest' ? 'bg-purple-100 text-purple-700' : 'text-gray-600'
-          }`}
-        >
-          Suggest
-        </button>
+    <div className="flex h-full flex-col text-white">
+      <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-[0.25em] text-white/60">
+        {['advice', 'rewrite', 'suggest'].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab as typeof activeTab)}
+            className={`flex-1 rounded-full px-3 py-2 text-[11px] tracking-[0.2em] ${
+              activeTab === tab
+                ? 'bg-gradient-to-r from-indigo-500/80 to-purple-500/80 text-white shadow-lg shadow-indigo-500/30'
+                : 'bg-white/5 text-white/50 hover:text-white'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
-        {/* Generate Tab */}
-        {activeTab === 'generate' && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-purple-600 mb-4">
-              <Sparkles size={20} />
-              <h3 className="font-semibold">AI Generate Presentation</h3>
+      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 text-sm">
+        {activeTab === 'advice' && (
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-white/5">
+            <div className="mb-4 flex items-center gap-2 text-white/80">
+              <Lightbulb size={18} />
+              <h3 className="text-base font-semibold">AI Slide Advice</h3>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Titlu</label>
-              <input
-                type="text"
-                value={generateForm.title}
-                onChange={(e) => setGenerateForm({ ...generateForm, title: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                placeholder="Ex: Product Launch"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Scop</label>
-              <input
-                type="text"
-                value={generateForm.purpose}
-                onChange={(e) => setGenerateForm({ ...generateForm, purpose: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                placeholder="Ex: Pitch investitori"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Audiență</label>
-              <input
-                type="text"
-                value={generateForm.audience}
-                onChange={(e) => setGenerateForm({ ...generateForm, audience: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                placeholder="Ex: Investitori, C-level"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Durată (minute)
-              </label>
-              <input
-                type="number"
-                value={generateForm.duration}
-                onChange={(e) =>
-                  setGenerateForm({ ...generateForm, duration: parseInt(e.target.value) })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
+            <p className="mb-4 text-xs text-white/60">
+              Get expert AI feedback on your current slide. Select a frame to analyze.
+            </p>
 
             <button
-              onClick={handleGenerate}
-              disabled={loading || !canEdit}
-              className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              onClick={handleGetAdvice}
+              disabled={loading || !selectedFrame}
+              className="mb-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-2 font-semibold uppercase tracking-wide text-white shadow-lg shadow-indigo-500/30 transition hover:shadow-indigo-500/50 disabled:opacity-40"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="animate-spin" size={16} />
-                  Generare...
-                </>
-              ) : (
-                <>
-                  <Sparkles size={16} />
-                  Generează
-                </>
-              )}
+              {loading ? <Loader2 className="animate-spin" size={16} /> : <Lightbulb size={16} />}
+              {loading ? 'Analyzing...' : 'Get AI Advice'}
             </button>
+
+            {advice && (
+              <div className="space-y-3">
+                {/* Overall Score */}
+                <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 p-3">
+                  <div className="text-xs uppercase tracking-wide text-white/60">Overall Score</div>
+                  <div className="mt-1 text-3xl font-bold text-white">{advice.overall_score}/10</div>
+                </div>
+
+                {/* Strengths */}
+                {advice.strengths && advice.strengths.length > 0 && (
+                  <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-3">
+                    <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-green-300">
+                      <CheckCircle size={14} />
+                      Strengths
+                    </div>
+                    <ul className="space-y-1 text-xs text-white/80">
+                      {advice.strengths.map((strength: string, idx: number) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-green-400">•</span>
+                          <span>{strength}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Improvements */}
+                {advice.improvements && advice.improvements.length > 0 && (
+                  <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-3">
+                    <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-yellow-300">
+                      <AlertCircle size={14} />
+                      Improvements
+                    </div>
+                    <ul className="space-y-1 text-xs text-white/80">
+                      {advice.improvements.map((improvement: string, idx: number) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-yellow-400">•</span>
+                          <span>{improvement}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Content Advice */}
+                {advice.content_advice && (
+                  <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/60">
+                      Content Advice
+                    </div>
+                    <p className="text-xs text-white/80">{advice.content_advice}</p>
+                  </div>
+                )}
+
+                {/* Design Advice */}
+                {advice.design_advice && (
+                  <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/60">
+                      Design Advice
+                    </div>
+                    <p className="text-xs text-white/80">{advice.design_advice}</p>
+                  </div>
+                )}
+
+                {/* Quick Wins */}
+                {advice.quick_wins && advice.quick_wins.length > 0 && (
+                  <div className="rounded-2xl border border-purple-500/20 bg-purple-500/10 p-3">
+                    <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-purple-300">
+                      <Sparkles size={14} />
+                      Quick Wins
+                    </div>
+                    <ul className="space-y-1 text-xs text-white/80">
+                      {advice.quick_wins.map((win: string, idx: number) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-purple-400">→</span>
+                          <span>{win}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Rewrite Tab */}
         {activeTab === 'rewrite' && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-purple-600 mb-4">
-              <Sparkles size={20} />
-              <h3 className="font-semibold">AI Rewrite Text</h3>
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-white/5">
+            <div className="mb-4 flex items-center gap-2 text-white/80">
+              <Sparkles size={18} />
+              <h3 className="text-base font-semibold">AI Rewrite</h3>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Text</label>
+            <div className="space-y-3">
               <textarea
                 value={rewriteText}
                 onChange={(e) => setRewriteText(e.target.value)}
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                placeholder="Introdu textul de rescris..."
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white placeholder:text-white/40 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                placeholder="Paste the text you want to enhance..."
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Stil</label>
               <select
                 value={rewriteMode}
                 onChange={(e) => setRewriteMode(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
               >
                 <option value="professional">Professional</option>
                 <option value="casual">Casual</option>
-                <option value="shorter">Mai scurt</option>
-                <option value="longer">Mai lung</option>
+                <option value="concise">More concise</option>
+                <option value="detailed">More detailed</option>
               </select>
-            </div>
-
-            <button
-              onClick={handleRewrite}
-              disabled={loading || !rewriteText}
-              className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="animate-spin" size={16} />
-                  Rescriere...
-                </>
-              ) : (
-                'Rescrie'
+              <button
+                onClick={handleRewrite}
+                disabled={loading || !rewriteText}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-2 font-semibold uppercase tracking-wide text-white shadow-lg shadow-indigo-500/30 transition hover:shadow-indigo-500/50 disabled:opacity-40"
+              >
+                {loading ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                {loading ? 'Rewriting' : 'Rewrite'}
+              </button>
+              {rewrittenText && (
+                <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-3 text-sm text-white/80">
+                  {rewrittenText}
+                </div>
               )}
-            </button>
-
-            {rewrittenText && (
-              <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
-                <p className="text-sm text-gray-700">{rewrittenText}</p>
-              </div>
-            )}
+            </div>
           </div>
         )}
 
-        {/* Suggest Tab */}
         {activeTab === 'suggest' && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-purple-600 mb-4">
-              <Sparkles size={20} />
-              <h3 className="font-semibold">AI Suggest Visuals</h3>
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-white/5">
+            <div className="mb-4 flex items-center gap-2 text-white/80">
+              <Sparkles size={18} />
+              <h3 className="text-base font-semibold">AI Visual Suggestions</h3>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Text pentru analiză
-              </label>
+            <div className="space-y-3">
               <textarea
                 value={suggestText}
                 onChange={(e) => setSuggestText(e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                placeholder="Introdu text pentru a primi sugestii de imagini/icoane..."
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white placeholder:text-white/40 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                placeholder="Describe the message or mood you need visuals for..."
               />
-            </div>
-
-            <button
-              onClick={handleSuggestVisuals}
-              disabled={loading || !suggestText}
-              className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50"
-            >
-              {loading ? 'Analizare...' : 'Sugerează'}
-            </button>
-
-            {suggestions.length > 0 && (
-              <div className="mt-4 space-y-2">
-                {suggestions.map((sug, idx) => (
-                  <div key={idx} className="p-3 bg-gray-50 rounded border border-gray-200">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">{sug.keyword}</span>
-                      <span className="text-xs text-gray-500">{sug.type}</span>
+              <button
+                onClick={handleSuggestVisuals}
+                disabled={loading || !suggestText}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-2 font-semibold uppercase tracking-wide text-white shadow-lg shadow-indigo-500/30 transition hover:shadow-indigo-500/50 disabled:opacity-40"
+              >
+                {loading ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                {loading ? 'Analyzing...' : 'Suggest visuals'}
+              </button>
+              {suggestions.length > 0 && (
+                <div className="space-y-2">
+                  {suggestions.map((sug, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-2xl border border-white/10 bg-slate-900/40 p-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-white">{sug.keyword}</span>
+                        <span className="rounded-full bg-indigo-500/20 px-2 py-1 text-xs uppercase tracking-wide text-indigo-300">
+                          {sug.type}
+                        </span>
+                      </div>
+                      {sug.description && (
+                        <p className="mt-1 text-xs text-white/60">{sug.description}</p>
+                      )}
+                      {sug.relevance && (
+                        <div className="mt-2">
+                          <div className="h-1 w-full overflow-hidden rounded-full bg-white/10">
+                            <div
+                              className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                              style={{ width: `${sug.relevance * 100}%` }}
+                            />
+                          </div>
+                          <div className="mt-1 text-xs text-white/40">
+                            {Math.round(sug.relevance * 100)}% relevant
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

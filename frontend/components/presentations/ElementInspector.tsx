@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Swal from 'sweetalert2';
 import {
   AlignCenter,
   AlignLeft,
@@ -13,20 +14,45 @@ import { usePresentation } from '@/contexts/PresentationContext';
 const FONT_OPTIONS = ['Inter', 'Poppins', 'Roboto', 'Montserrat', 'Playfair Display'];
 
 const ALIGN_OPTIONS = [
-  { icon: AlignLeft, value: 'left', label: 'Left' },
-  { icon: AlignCenter, value: 'center', label: 'Center' },
-  { icon: AlignRight, value: 'right', label: 'Right' },
+  { icon: AlignLeft, value: 'left', label: 'Align left' },
+  { icon: AlignCenter, value: 'center', label: 'Align center' },
+  { icon: AlignRight, value: 'right', label: 'Align right' },
 ];
 
-export default function ElementInspector() {
-  const {
-    selectedElement,
-    updateElement,
-    deleteElement,
-    canEdit,
-  } = usePresentation();
+const ANIMATION_TYPES = [
+  { value: 'fade', label: 'Fade' },
+  { value: 'slide', label: 'Slide' },
+  { value: 'zoom', label: 'Zoom' },
+  { value: 'bounce', label: 'Bounce' },
+];
 
+const DIRECTION_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  fade: [{ value: 'none', label: 'None' }],
+  zoom: [{ value: 'none', label: 'None' }],
+  bounce: [{ value: 'none', label: 'None' }],
+  slide: [
+    { value: 'up', label: 'Up' },
+    { value: 'down', label: 'Down' },
+    { value: 'left', label: 'Left' },
+    { value: 'right', label: 'Right' },
+  ],
+};
+
+const DEFAULT_ANIMATION_SETTINGS = {
+  type: 'fade',
+  direction: 'up',
+  duration: 0.8,
+  delay: 0,
+  easing: 'easeInOut',
+};
+
+export default function ElementInspector() {
+  const { selectedElement, updateElement, deleteElement, canEdit } = usePresentation();
   const [textDraft, setTextDraft] = useState('');
+  const animationSettings = {
+    ...DEFAULT_ANIMATION_SETTINGS,
+    ...(selectedElement?.animation_settings_parsed || {}),
+  };
 
   useEffect(() => {
     if (selectedElement?.element_type === 'TEXT') {
@@ -38,8 +64,8 @@ export default function ElementInspector() {
 
   if (!selectedElement) {
     return (
-      <div className="p-4 border-b border-gray-200 text-sm text-gray-500">
-        Selecteaz�? un element din canvas pentru a edita propriet�?�?ile, similar cu editorul Prezi.
+      <div className="m-4 rounded-3xl border border-white/10 bg-white/5 p-4 text-sm text-white/70 shadow-inner shadow-white/5">
+        Select an element on the canvas to edit its properties.
       </div>
     );
   }
@@ -83,36 +109,55 @@ export default function ElementInspector() {
     });
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!canEdit) return;
-    const confirmed = window.confirm('Sigur dori�?>i s�? �tegi elementul selectat?');
-    if (confirmed) {
+    const result = await Swal.fire({
+      title: 'Delete element?',
+      text: 'This element will be removed from the frame.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#475569',
+      confirmButtonText: 'Delete',
+    });
+    if (result.isConfirmed) {
       deleteElement(selectedElement.id);
     }
   };
 
+  const handleAnimationChange = (patch: Partial<typeof animationSettings>) => {
+    if (!canEdit || !selectedElement) return;
+    let next = { ...animationSettings, ...patch };
+    if (patch.type && patch.type !== 'slide') {
+      next = { ...next, direction: 'none' };
+    }
+    updateElement(selectedElement.id, {
+      animation_settings: JSON.stringify(next),
+    });
+  };
+
+  const baseInput = `mt-1 w-full rounded-lg border px-2 py-1 text-sm text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${controlsDisabled ? 'cursor-not-allowed border-white/5 bg-white/5 text-white/30' : 'border-white/10 bg-white/5'}`;
+
   return (
-    <div className="border-b border-gray-200 bg-white">
+    <div className="m-4 rounded-3xl border border-white/10 bg-white/5 text-white shadow-inner shadow-white/5">
       <div className="flex items-center justify-between px-4 py-3">
         <div>
-          <p className="text-xs uppercase text-gray-500">Element activ</p>
-          <p className="text-sm font-semibold text-gray-900">
-            {selectedElement.element_type}
-          </p>
+          <p className="text-[11px] uppercase tracking-[0.3em] text-white/40">Active element</p>
+          <p className="text-sm font-semibold text-white">{selectedElement.element_type}</p>
         </div>
         {canEdit && (
           <div className="flex items-center gap-2">
             <button
-              className="p-2 rounded hover:bg-gray-100"
+              className="rounded-full border border-white/10 p-2 text-white/70 transition hover:bg-white/10"
               onClick={() => handlePositionChange('z_index', position.z_index + 1)}
-              title="Adu �Rn fa�?>�?"
+              title="Bring forward"
             >
-              <Layers size={16} className="text-gray-700" />
+              <Layers size={16} />
             </button>
             <button
-              className="p-2 rounded hover:bg-red-50 text-red-600"
+              className="rounded-full border border-white/10 p-2 text-red-300 transition hover:bg-red-500/20 hover:text-red-100"
               onClick={handleDelete}
-              title="�Stege element"
+              title="Delete element"
             >
               <Trash2 size={16} />
             </button>
@@ -120,95 +165,67 @@ export default function ElementInspector() {
         )}
       </div>
 
-      {/* Layout controls */}
-      <section className="px-4 pb-4 space-y-2">
-        <p className="text-xs font-semibold text-gray-500 tracking-wide">Pozitionare</p>
-        <div className="grid grid-cols-2 gap-3">
+      <section className="px-4 pb-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/40">
+          Position
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-3">
           {[
             { label: 'X', key: 'x', step: 1 },
             { label: 'Y', key: 'y', step: 1 },
-            { label: 'L�?ime', key: 'width', step: 5, min: 20 },
-            { label: 'În�?l�?ime', key: 'height', step: 5, min: 20 },
-          ].map(({ label, key, step, min }) => (
-            <label key={key} className="flex flex-col text-xs text-gray-600">
+            { label: 'Width', key: 'width', step: 10 },
+            { label: 'Height', key: 'height', step: 10 },
+            { label: 'Rotation', key: 'rotation', step: 1 },
+            { label: 'Layer (z-index)', key: 'z_index', step: 1 },
+          ].map(({ label, key, step }) => (
+            <label key={key} className="text-xs text-white/70">
               {label}
               <input
                 type="number"
-                disabled={controlsDisabled}
-                min={min ?? -1000}
                 step={step}
-                value={Math.round(position[key as keyof typeof position])}
-                onChange={(e) => handlePositionChange(
-                  key as keyof typeof position,
-                  parseFloat(e.target.value)
-                )}
-                className={`mt-1 rounded border px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  controlsDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'border-gray-300'
-                }`}
+                disabled={controlsDisabled}
+                value={position[key]}
+                onChange={(e) => handlePositionChange(key, parseFloat(e.target.value))}
+                className={baseInput}
               />
             </label>
           ))}
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col text-xs text-gray-600">
-            Rotire
-            <input
-              type="number"
-              disabled={controlsDisabled}
-              step={1}
-              value={Math.round(position.rotation)}
-              onChange={(e) => handlePositionChange('rotation', parseFloat(e.target.value))}
-              className={`mt-1 rounded border px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                controlsDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'border-gray-300'
-              }`}
-            />
-          </label>
-          <label className="flex flex-col text-xs text-gray-600">
-            Strat (z-index)
-            <input
-              type="number"
-              step={1}
-              disabled={controlsDisabled}
-              value={position.z_index}
-              onChange={(e) => handlePositionChange('z_index', parseInt(e.target.value, 10))}
-              className={`mt-1 rounded border px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                controlsDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'border-gray-300'
-              }`}
-            />
-          </label>
-        </div>
       </section>
 
-      {/* Text controls */}
       {isText && (
-        <section className="px-4 pb-4 space-y-3 border-t border-gray-100">
-          <div className="flex items-center justify-between pt-4">
-            <p className="text-xs font-semibold text-gray-500 tracking-wide">Text</p>
-            <span className="text-[11px] text-gray-400">
-              Stil Livresq / Prezi
+        <section className="border-t border-white/5 px-4 pb-4 pt-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/40">
+              Text styling
+            </p>
+            <span className="text-xs text-white/50">
+              {(selectedElement.content_parsed?.text || '').length} chars
             </span>
           </div>
 
-          <textarea
-            value={textDraft}
-            disabled={controlsDisabled}
-            onChange={(e) => setTextDraft(e.target.value)}
-            onBlur={() => handleContentChange({ text: textDraft })}
-            placeholder="Scrie con�?inutul..."
-            className={`w-full rounded-lg border px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-              controlsDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'border-gray-300'
-            }`}
-            rows={3}
-          />
+          <label className="mt-3 block text-xs text-white/70">
+            Content
+            <textarea
+              value={textDraft}
+              disabled={controlsDisabled}
+              onChange={(e) => {
+                setTextDraft(e.target.value);
+                handleContentChange({ text: e.target.value });
+              }}
+              rows={3}
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${controlsDisabled ? 'cursor-not-allowed border-white/5 bg-white/5 text-white/30' : 'border-white/10 bg-white/5'}`}
+            />
+          </label>
 
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-600">
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <label className="text-xs text-white/70">
               Font
               <select
-                className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={controlsDisabled}
                 value={selectedElement.content_parsed?.fontFamily || 'Inter'}
+                disabled={controlsDisabled}
                 onChange={(e) => handleContentChange({ fontFamily: e.target.value })}
+                className={baseInput}
               >
                 {FONT_OPTIONS.map((font) => (
                   <option key={font} value={font}>
@@ -217,8 +234,8 @@ export default function ElementInspector() {
                 ))}
               </select>
             </label>
-            <label className="text-xs text-gray-600">
-              M�?rime
+            <label className="text-xs text-white/70">
+              Size
               <input
                 type="number"
                 min={10}
@@ -226,36 +243,32 @@ export default function ElementInspector() {
                 disabled={controlsDisabled}
                 value={selectedElement.content_parsed?.fontSize || 24}
                 onChange={(e) => handleContentChange({ fontSize: parseInt(e.target.value, 10) })}
-                className={`mt-1 w-full rounded border px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  controlsDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'border-gray-300'
-                }`}
+                className={baseInput}
               />
             </label>
-            <label className="text-xs text-gray-600">
-              Culoare
+            <label className="text-xs text-white/70">
+              Color
               <input
                 type="color"
                 disabled={controlsDisabled}
-                value={selectedElement.content_parsed?.color || '#000000'}
+                value={selectedElement.content_parsed?.color || '#ffffff'}
                 onChange={(e) => handleContentChange({ color: e.target.value })}
-                className={`mt-1 h-9 w-full rounded border p-1 ${
-                  controlsDisabled ? 'bg-gray-100 cursor-not-allowed border-gray-200' : 'border-gray-300'
-                }`}
+                className={`mt-1 h-10 w-full rounded-lg border p-1 ${controlsDisabled ? 'cursor-not-allowed border-white/5 bg-white/5' : 'border-white/10 bg-white/5'}`}
               />
             </label>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="mt-3 flex items-center gap-2">
             {ALIGN_OPTIONS.map(({ icon: Icon, value, label }) => (
               <button
                 key={value}
                 disabled={controlsDisabled}
                 onClick={() => handleContentChange({ align: value })}
-                className={`flex-1 border rounded-lg py-2 text-sm flex items-center justify-center gap-1 ${
+                className={`flex flex-1 items-center justify-center gap-1 rounded-lg border py-2 text-sm ${
                   selectedElement.content_parsed?.align === value
-                    ? 'bg-blue-50 border-blue-400 text-blue-600'
-                    : 'border-gray-200 text-gray-600 hover:border-blue-300'
-                } ${controlsDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    ? 'border-indigo-400/70 bg-indigo-500/20 text-white'
+                    : 'border-white/10 text-white/70 hover:border-indigo-400/40'
+                } ${controlsDisabled ? 'cursor-not-allowed opacity-50' : ''}`}
                 title={label}
               >
                 <Icon size={16} />
@@ -265,74 +278,149 @@ export default function ElementInspector() {
         </section>
       )}
 
-      {/* Shape controls */}
       {isShape && (
-        <section className="px-4 pb-4 space-y-3 border-t border-gray-100">
-          <div className="flex items-center justify-between pt-4">
-            <p className="text-xs font-semibold text-gray-500 tracking-wide">
-              Form�? (Shape)
-            </p>
-          </div>
+        <section className="space-y-3 border-t border-white/5 px-4 pb-4 pt-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/40">
+            Shape styling
+          </p>
 
-          <label className="text-xs text-gray-600">
-            Tip form�?
+          <label className="text-xs text-white/70">
+            Shape type
             <select
               value={selectedElement.content_parsed?.shape || 'rectangle'}
               disabled={controlsDisabled}
               onChange={(e) => handleContentChange({ shape: e.target.value })}
-              className={`mt-1 w-full rounded border px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                controlsDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'border-gray-300'
-              }`}
+              className={baseInput}
             >
-              <option value="rectangle">Dreptunghi</option>
-              <option value="circle">Cerc</option>
+              <option value="rectangle">Rectangle</option>
+              <option value="circle">Circle</option>
             </select>
           </label>
 
           <div className="grid grid-cols-3 gap-3">
-            <label className="text-xs text-gray-600">
-              Umplere
+            <label className="text-xs text-white/70">
+              Fill
               <input
                 type="color"
                 disabled={controlsDisabled}
-                value={selectedElement.content_parsed?.fill || '#3b82f6'}
+                value={selectedElement.content_parsed?.fill || '#818cf8'}
                 onChange={(e) => handleContentChange({ fill: e.target.value })}
-                className={`mt-1 h-9 w-full rounded border p-1 ${
-                  controlsDisabled ? 'bg-gray-100 cursor-not-allowed border-gray-200' : 'border-gray-300'
-                }`}
+                className={`mt-1 h-10 w-full rounded border p-1 ${controlsDisabled ? 'cursor-not-allowed border-white/5 bg-white/5' : 'border-white/10 bg-white/5'}`}
               />
             </label>
-            <label className="text-xs text-gray-600">
-              Contur
+            <label className="text-xs text-white/70">
+              Outline
               <input
                 type="color"
                 disabled={controlsDisabled}
-                value={selectedElement.content_parsed?.stroke || '#1e40af'}
+                value={selectedElement.content_parsed?.stroke || '#6366f1'}
                 onChange={(e) => handleContentChange({ stroke: e.target.value })}
-                className={`mt-1 h-9 w-full rounded border p-1 ${
-                  controlsDisabled ? 'bg-gray-100 cursor-not-allowed border-gray-200' : 'border-gray-300'
-                }`}
+                className={`mt-1 h-10 w-full rounded border p-1 ${controlsDisabled ? 'cursor-not-allowed border-white/5 bg-white/5' : 'border-white/10 bg-white/5'}`}
               />
             </label>
-            <label className="text-xs text-gray-600">
-              Grosime
+            <label className="text-xs text-white/70">
+              Stroke
               <input
                 type="number"
                 min={0}
                 max={20}
                 disabled={controlsDisabled}
                 value={selectedElement.content_parsed?.strokeWidth || 2}
-                onChange={(e) =>
-                  handleContentChange({ strokeWidth: parseInt(e.target.value, 10) })
-                }
-                className={`mt-1 w-full rounded border px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  controlsDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'border-gray-300'
-                }`}
+                onChange={(e) => handleContentChange({ strokeWidth: parseInt(e.target.value, 10) })}
+                className={baseInput}
               />
             </label>
           </div>
         </section>
       )}
+
+      <section className="space-y-3 border-t border-white/5 px-4 pb-4 pt-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/40">
+          Animation
+        </p>
+        <label className="text-xs text-white/70">
+          Type
+          <select
+            value={animationSettings.type}
+            disabled={controlsDisabled}
+            onChange={(e) => handleAnimationChange({ type: e.target.value })}
+            className={`mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${
+              controlsDisabled ? 'opacity-50' : ''
+            }`}
+          >
+            {ANIMATION_TYPES.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {animationSettings.type === 'slide' && (
+          <label className="text-xs text-white/70">
+            Direction
+            <select
+              value={animationSettings.direction}
+              disabled={controlsDisabled}
+              onChange={(e) => handleAnimationChange({ direction: e.target.value })}
+              className={`mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${
+                controlsDisabled ? 'opacity-50' : ''
+              }`}
+            >
+              {DIRECTION_OPTIONS.slide.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        <label className="text-xs text-white/70">
+          Duration ({animationSettings.duration.toFixed(1)}s)
+          <input
+            type="range"
+            min={0.2}
+            max={2}
+            step={0.1}
+            disabled={controlsDisabled}
+            value={animationSettings.duration}
+            onChange={(e) => handleAnimationChange({ duration: parseFloat(e.target.value) })}
+            className="mt-1 w-full accent-indigo-400"
+          />
+        </label>
+
+        <label className="text-xs text-white/70">
+          Delay ({animationSettings.delay.toFixed(1)}s)
+          <input
+            type="range"
+            min={0}
+            max={2}
+            step={0.1}
+            disabled={controlsDisabled}
+            value={animationSettings.delay}
+            onChange={(e) => handleAnimationChange({ delay: parseFloat(e.target.value) })}
+            className="mt-1 w-full accent-indigo-400"
+          />
+        </label>
+
+        <label className="text-xs text-white/70">
+          Easing
+          <select
+            value={animationSettings.easing}
+            disabled={controlsDisabled}
+            onChange={(e) => handleAnimationChange({ easing: e.target.value })}
+            className={`mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${
+              controlsDisabled ? 'opacity-50' : ''
+            }`}
+          >
+            <option value="easeInOut">Ease In-Out</option>
+            <option value="easeOut">Ease Out</option>
+            <option value="easeIn">Ease In</option>
+            <option value="linear">Linear</option>
+          </select>
+        </label>
+      </section>
     </div>
   );
 }
