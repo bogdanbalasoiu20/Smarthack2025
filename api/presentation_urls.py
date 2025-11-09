@@ -9,6 +9,7 @@ from .presentation_views import (
     FrameViewSet, FrameConnectionViewSet, ElementViewSet,
     CommentViewSet, RecordingViewSet,
     ai_generate_presentation, ai_rewrite_text, ai_suggest_visuals,
+    ai_generate_full_presentation,
     export_presentation_pdf, export_presentation_images
 )
 
@@ -30,6 +31,7 @@ urlpatterns = [
 
     # AI endpoints
     path('ai/generate/', ai_generate_presentation, name='ai-generate'),
+    path('ai/generate-full/', ai_generate_full_presentation, name='ai-generate-full'),
     path('ai/rewrite/', ai_rewrite_text, name='ai-rewrite'),
     path('ai/suggest-visuals/', ai_suggest_visuals, name='ai-suggest-visuals'),
 

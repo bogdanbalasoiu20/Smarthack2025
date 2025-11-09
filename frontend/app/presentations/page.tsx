@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getStoredToken, clearStoredToken } from "@/lib/authToken";
+import AIGenerateDialog from "@/components/presentations/AIGenerateDialog";
+import Swal from "sweetalert2";
 
 interface Presentation {
   id: number;
@@ -22,6 +24,7 @@ export default function PresentationsPage() {
   const [presentations, setPresentations] = useState<Presentation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -108,6 +111,11 @@ export default function PresentationsPage() {
       console.error("Error creating presentation:", err);
       setError("Nu am putut crea prezentarea. Reincercati.");
     }
+  };
+
+  const handleAISuccess = (presentationId: number) => {
+    // Navigate to the newly created presentation
+    router.push(`/presentations/${presentationId}`);
   };
 
   const content = useMemo(() => {
@@ -226,6 +234,25 @@ export default function PresentationsPage() {
               Dashboard
             </Link>
             <button
+              onClick={() => setAiDialogOpen(true)}
+              className="px-6 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white rounded-lg transition-all font-medium flex items-center shadow-md hover:shadow-lg"
+            >
+              <svg
+                className="w-5 h-5 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+              Generate with AI
+            </button>
+            <button
               onClick={createPresentation}
               className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium flex items-center"
             >
@@ -256,6 +283,12 @@ export default function PresentationsPage() {
         )}
         {content}
       </main>
+
+      <AIGenerateDialog
+        open={aiDialogOpen}
+        onOpenChange={setAiDialogOpen}
+        onSuccess={handleAISuccess}
+      />
     </div>
   );
 }

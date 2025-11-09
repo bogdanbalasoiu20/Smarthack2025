@@ -23,6 +23,7 @@ from .presentation_serializers import (
     ElementSerializer, CommentSerializer, PresentationVersionSerializer,
     RecordingSerializer, UserMinimalSerializer
 )
+from .ai_service import PresentationAIService
 
 
 # ===== PERMISIUNI CUSTOM =====
@@ -637,6 +638,136 @@ def ai_suggest_visuals(request):
     ]
 
     return Response({'suggestions': suggestions})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def ai_generate_full_presentation(request):
+    """
+    Generate a complete presentation from a user prompt using AI.
+
+    Input:
+    {
+        "prompt": "Create a presentation about climate change solutions",
+        "num_slides": 7  // optional
+    }
+
+    Output:
+    {
+        "presentation_id": 123,
+        "title": "Climate Change Solutions",
+        "num_frames": 7,
+        "message": "Presentation generated successfully"
+    }
+    """
+    prompt = request.data.get('prompt', '').strip()
+    num_slides = request.data.get('num_slides', None)
+
+    if not prompt:
+        return Response(
+            {'error': 'Prompt is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        # Initialize AI service
+        ai_service = PresentationAIService()
+
+        # Generate presentation structure
+        presentation_data = ai_service.generate_presentation_structure(
+            prompt=prompt,
+            num_slides=num_slides
+        )
+
+        # Create presentation in database
+        now = timezone.now()
+        presentation = Presentation.objects.create(
+            owner=request.user,
+            title=presentation_data['title'],
+            description=presentation_data.get('description', ''),
+            canvas_settings=json.dumps({
+                'zoom': 1.0,
+                'viewport': {'x': 0, 'y': 0},
+                'background': '#ffffff'
+            }),
+            presentation_path=json.dumps([]),
+            share_token=secrets.token_urlsafe(32),
+            is_public=0,
+            thumbnail_url='',
+            created_at=now,
+            updated_at=now
+        )
+
+        # Create frames and elements
+        frame_ids = []
+        for frame_data in presentation_data['frames']:
+            # Create frame
+            frame = Frame.objects.create(
+                presentation=presentation,
+                title=frame_data.get('title', f"Slide {frame_data['order'] + 1}"),
+                order=frame_data['order'],
+                background_color=frame_data.get('background_color', '#ffffff'),
+                background_image='',
+                position=json.dumps({
+                    'x': 0,
+                    'y': 0,
+                    'width': 1920,
+                    'height': 1080,
+                    'rotation': 0
+                }),
+                transition_settings=json.dumps({
+                    'type': 'fade',
+                    'duration': 0.8,
+                    'delay': 0,
+                    'direction': 'none'
+                }),
+                thumbnail_url='',
+                created_at=now,
+                updated_at=now
+            )
+
+            frame_ids.append(frame.id)
+
+            # Create elements for this frame
+            for element_data in frame_data.get('elements', []):
+                Element.objects.create(
+                    frame=frame,
+                    element_type=element_data['type'],
+                    position=json.dumps(element_data['position']),
+                    content=json.dumps(element_data['content']),
+                    animation_settings=json.dumps({
+                        'type': 'fade',
+                        'duration': 0.8,
+                        'delay': 0,
+                        'easing': 'easeInOut',
+                        'direction': 'up'
+                    }),
+                    link_url='',
+                    created_at=now,
+                    updated_at=now
+                )
+
+        # Update presentation path with frame IDs
+        presentation.presentation_path = json.dumps(frame_ids)
+        presentation.save()
+
+        return Response({
+            'presentation_id': presentation.id,
+            'title': presentation.title,
+            'num_frames': len(frame_ids),
+            'message': 'Presentation generated successfully'
+        }, status=status.HTTP_201_CREATED)
+
+    except ValueError as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to generate presentation: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 # ===== EXPORT PDF/IMAGES =====

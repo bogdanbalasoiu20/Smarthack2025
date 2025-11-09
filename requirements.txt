@@ -4,3 +4,4 @@ channels
 mysql-connector-python
 daphne
 django-cors-headers
+anthropic
