@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function GameJoinPage() {
+function GameJoinContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialPin = searchParams.get("pin") || "";
@@ -95,5 +95,19 @@ export default function GameJoinPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function GameJoinPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="app-page flex items-center justify-center text-slate-300">
+          Loading join form...
+        </div>
+      }
+    >
+      <GameJoinContent />
+    </Suspense>
   );
 }
