@@ -276,7 +276,7 @@ export default function LoginPage() {
 
             <div className="text-sm">
               <a
-                href="#"
+                href="http://localhost:3000/forget"
                 className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
               >
                 Forgot password?
