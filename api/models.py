@@ -305,3 +305,58 @@ class AccessControlEntry(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.role}"
+
+
+# ===== STUDENT GROUPS / STUDENTS =====
+class StudentGroup(models.Model):
+    """Logical grouping of students (classes, cohorts, clubs)."""
+    id = models.BigAutoField(primary_key=True)
+    slug = models.SlugField(max_length=64, unique=True)
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = True
+        db_table = 'api_studentgroup'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class Student(models.Model):
+    """Basic student directory entry (optionally linked to an auth user)."""
+    id = models.BigAutoField(primary_key=True)
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150)
+    email = models.EmailField(blank=True)
+    group = models.ForeignKey(
+        StudentGroup,
+        models.PROTECT,
+        related_name='students',
+        db_column='group_id',
+    )
+    user = models.OneToOneField(
+        User,
+        models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='student_profile',
+        db_column='user_id',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = True
+        db_table = 'api_student'
+        ordering = ['last_name', 'first_name']
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name}"
+
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}".strip()

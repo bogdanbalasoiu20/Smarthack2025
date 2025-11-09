@@ -4,7 +4,7 @@ from .models import (
     Presentation, PresentationAccess,
     Frame, FrameConnection, Element,
     Comment, PresentationVersion, Recording,
-    CollaborationSession
+    CollaborationSession, StudentGroup, Student
 )
 
 
@@ -106,3 +106,18 @@ class CollaborationSessionAdmin(admin.ModelAdmin):
     list_filter = ("joined_at", "last_seen")
     search_fields = ("user__username", "presentation__title")
     raw_id_fields = ("presentation", "user")
+
+
+@admin.register(StudentGroup)
+class StudentGroupAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "created_at", "updated_at")
+    search_fields = ("name", "slug")
+    prepopulated_fields = {"slug": ("name",)}
+
+
+@admin.register(Student)
+class StudentAdmin(admin.ModelAdmin):
+    list_display = ("first_name", "last_name", "group", "email", "user")
+    search_fields = ("first_name", "last_name", "email")
+    list_filter = ("group",)
+    raw_id_fields = ("group", "user")
