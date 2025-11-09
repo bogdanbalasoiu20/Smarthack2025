@@ -13,8 +13,11 @@ import {
   Type,
   Square,
   Circle,
+  FileText,
+  Presentation,
 } from 'lucide-react';
 import { usePresentation } from '@/contexts/PresentationContext';
+import { getStoredToken } from '@/lib/authToken';
 
 const primaryButton =
   'rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:scale-[1.01] hover:shadow-indigo-500/50';
@@ -34,10 +37,11 @@ export default function Toolbar({ onOpenShare }: ToolbarProps) {
     canEdit,
   } = usePresentation();
   const [saving, setSaving] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
-    // Auto-save already runs in the background, but we surface a quick state change for feedback
     setTimeout(() => setSaving(false), 500);
   };
 
@@ -119,6 +123,74 @@ export default function Toolbar({ onOpenShare }: ToolbarProps) {
     }
   };
 
+  const handleExport = async (format: 'pdf' | 'pptx') => {
+    if (!presentation) return;
+
+    setExporting(true);
+    setShowExportMenu(false);
+
+    try {
+      const token = getStoredToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api';
+      const formatName = format === 'pdf' ? 'PDF' : 'PowerPoint';
+
+      Swal.fire({
+        title: `Exporting to ${formatName}...`,
+        text: 'Please wait while we generate your file.',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      const response = await fetch(
+        `${API_BASE_URL}/presentations/${presentation.id}/export/${format}/`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Token ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `Failed to export to ${formatName}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${presentation.title}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Export Successful!',
+        text: `Your presentation has been exported to ${formatName}.`,
+        confirmButtonColor: '#6366f1',
+      });
+    } catch (error: any) {
+      console.error('Export error:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Export Failed',
+        text: error.message || 'An error occurred during export.',
+        confirmButtonColor: '#ef4444',
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="rounded-[32px] border border-white/10 bg-white/5 px-6 py-4 text-white shadow-[0_40px_120px_rgba(3,7,18,0.65)] backdrop-blur-2xl">
       <div className="flex items-center justify-between gap-6">
@@ -172,15 +244,47 @@ export default function Toolbar({ onOpenShare }: ToolbarProps) {
         )}
 
         <div className="flex items-center gap-3">
-        <button className={subtleButton} title="Share workspace" onClick={onOpenShare}>
-          <Share2 size={18} />
-        </button>
+          <button className={subtleButton} title="Share workspace" onClick={onOpenShare}>
+            <Share2 size={18} />
+          </button>
           <button className={subtleButton} title="Collaborators">
             <Users size={18} />
           </button>
-          <button className={subtleButton} title="Download">
-            <Download size={18} />
-          </button>
+
+          <div className="relative">
+            <button
+              className={subtleButton}
+              title="Export"
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              disabled={exporting}
+            >
+              <Download size={18} />
+            </button>
+
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-white/10 bg-slate-900/95 backdrop-blur-xl shadow-2xl z-50">
+                <div className="p-2 space-y-1">
+                  <button
+                    onClick={() => handleExport('pdf')}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition"
+                    disabled={exporting}
+                  >
+                    <FileText size={18} />
+                    <span>Export to PDF</span>
+                  </button>
+                  <button
+                    onClick={() => handleExport('pptx')}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition"
+                    disabled={exporting}
+                  >
+                    <Presentation size={18} />
+                    <span>Export to PowerPoint</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="h-6 w-px bg-white/15" />
           <button
             onClick={() => router.push(`/presentations/${presentation?.id}/present`)}
@@ -191,6 +295,13 @@ export default function Toolbar({ onOpenShare }: ToolbarProps) {
           </button>
         </div>
       </div>
+
+      {showExportMenu && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setShowExportMenu(false)}
+        />
+      )}
     </div>
   );
 }

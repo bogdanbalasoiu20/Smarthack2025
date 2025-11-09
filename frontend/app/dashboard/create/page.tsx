@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
-import QuestionEditor from '@/components/game/QuestionEditor'; 
-import { API_BASE_URL } from '@/lib/api'; 
+import { useRouter } from 'next/navigation';
+import QuestionEditor from '@/components/game/QuestionEditor';
+import { API_BASE_URL } from '@/lib/api';
+import { getStoredToken } from '@/lib/authToken'; 
 
 // --- TIPURI DE DATE ---
 type Choice = { text: string; isCorrect: boolean };
@@ -150,11 +152,20 @@ const useIsMounted = () => {
 
 
 export default function CreateGamePage() {
-    const isMounted = useIsMounted(); 
-    
+    const router = useRouter();
+    const isMounted = useIsMounted();
+
     const [game, setGame] = useState<GameData>({ title: '', questions: [] });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Check authentication on mount
+    useEffect(() => {
+        const token = getStoredToken();
+        if (!token) {
+            router.replace('/login');
+        }
+    }, [router]);
     
     // --- Funcționalitatea rămâne neschimbată ---
     const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,13 +224,18 @@ export default function CreateGamePage() {
         };
 
         try {
-            const gameResponse = await fetch(`${API_BASE_URL}/api/games/`, {
+            const token = getStoredToken();
+            if (!token) {
+                throw new Error('Nu ești autentificat. Te rugăm să te autentifici.');
+            }
+
+            const gameResponse = await fetch(`${API_BASE_URL}/games/`, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
-                    // Aici ar trebui să fie token-ul de autentificare
+                    'Authorization': `Token ${token}`,
                 },
-                body: JSON.stringify(finalPayload), 
+                body: JSON.stringify(finalPayload),
             });
 
             if (!gameResponse.ok) {
@@ -228,12 +244,11 @@ export default function CreateGamePage() {
             }
             
             const createdGame = await gameResponse.json();
-            
+
             alert(`Jocul "${createdGame.title}" (ID: ${createdGame.id}) a fost salvat cu succes!`);
-            
-            // TODO: Redirecționează profesorul
-            
-            setGame({ title: '', questions: [] }); 
+
+            // Redirect to dashboard
+            router.push('/dashboard'); 
             
         } catch (e) {
             setError(e instanceof Error ? e.message : 'A aparut o eroare necunoscută.');

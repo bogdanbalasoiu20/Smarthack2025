@@ -24,6 +24,7 @@ from .presentation_serializers import (
     RecordingSerializer, UserMinimalSerializer
 )
 from .ai_service import PresentationAIService
+from .export_service import PresentationExportService
 
 
 # ===== PERMISIUNI CUSTOM =====
@@ -849,16 +850,15 @@ def ai_generate_full_presentation(request):
 
 
 # ===== EXPORT PDF/IMAGES =====
-@api_view(['POST'])
+@api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def export_presentation_pdf(request, presentation_id):
     """
-    Export prezentare ca PDF.
-    TODO: Implementare cu librărie PDF (ex: WeasyPrint, ReportLab)
+    Export presentation as PDF.
     """
     presentation = get_object_or_404(Presentation, id=presentation_id)
 
-    # Verifică permisiuni
+    # Check permissions
     if presentation.owner != request.user:
         access = PresentationAccess.objects.filter(
             presentation=presentation,
@@ -867,29 +867,38 @@ def export_presentation_pdf(request, presentation_id):
         if not access:
             return Response({'error': 'No access'}, status=status.HTTP_403_FORBIDDEN)
 
-    # TODO: Generare PDF real
-    # Deocamdată returnăm placeholder
+    try:
+        export_service = PresentationExportService(presentation)
+        return export_service.export_to_pdf()
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to export PDF: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
-    return Response({
-        'status': 'processing',
-        'message': 'PDF generation in progress',
-        'download_url': f'/api/presentations/{presentation_id}/download/pdf/'
-    })
 
-
-@api_view(['POST'])
+@api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def export_presentation_images(request, presentation_id):
+def export_presentation_pptx(request, presentation_id):
     """
-    Export frames ca imagini (thumbnails).
-    TODO: Implementare cu screenshot/rendering
+    Export presentation as PowerPoint (.pptx).
     """
     presentation = get_object_or_404(Presentation, id=presentation_id)
 
-    # Verifică permisiuni (similar cu PDF)
+    # Check permissions
+    if presentation.owner != request.user:
+        access = PresentationAccess.objects.filter(
+            presentation=presentation,
+            user=request.user
+        ).first()
+        if not access:
+            return Response({'error': 'No access'}, status=status.HTTP_403_FORBIDDEN)
 
-    return Response({
-        'status': 'processing',
-        'message': 'Image export in progress',
-        'images': []
-    })
+    try:
+        export_service = PresentationExportService(presentation)
+        return export_service.export_to_pptx()
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to export PowerPoint: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

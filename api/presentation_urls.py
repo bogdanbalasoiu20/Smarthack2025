@@ -10,7 +10,7 @@ from .presentation_views import (
     CommentViewSet, RecordingViewSet,
     ai_generate_presentation, ai_rewrite_text, ai_suggest_visuals,
     ai_get_slide_advice, ai_generate_full_presentation,
-    export_presentation_pdf, export_presentation_images
+    export_presentation_pdf, export_presentation_pptx
 )
 
 router = DefaultRouter()
@@ -38,5 +38,5 @@ urlpatterns = [
 
     # Export endpoints
     path('presentations/<int:presentation_id>/export/pdf/', export_presentation_pdf, name='export-pdf'),
-    path('presentations/<int:presentation_id>/export/images/', export_presentation_images, name='export-images'),
+    path('presentations/<int:presentation_id>/export/pptx/', export_presentation_pptx, name='export-pptx'),
 ]

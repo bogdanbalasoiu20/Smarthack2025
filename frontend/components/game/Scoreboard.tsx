@@ -1,131 +1,62 @@
 "use client";
 
-import React from 'react';
+import React from "react";
 
 type Player = { id: string; name: string; score?: number };
 
-// --- STYLING OBJECTS (Reutilizate) ---
-const styles = {
-  container: {
-    padding: '30px',
-    maxWidth: '600px',
-    margin: '0 auto',
-    backgroundColor: '#fff',
-    borderRadius: '15px',
-    boxShadow: '0 6px 20px rgba(0, 0, 0, 0.1)',
-    textAlign: 'center' as 'center',
-  },
-  title: {
-    fontSize: '2.5rem',
-    fontWeight: '800',
-    marginBottom: '30px',
-    color: '#3876FF', 
-    borderBottom: '4px solid #f0f0f0',
-    paddingBottom: '10px',
-  },
-  list: {
-    listStyle: 'none',
-    padding: 0,
-  },
-  listItemBase: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '15px 20px',
-    marginBottom: '10px',
-    borderRadius: '8px',
-    fontWeight: '600',
-    fontSize: '1.2rem',
-  },
-  podium: {
-    1: {
-      backgroundColor: '#FFD700', // Aur
-      color: '#333',
-      transform: 'scale(1.05)',
-      boxShadow: '0 4px 10px rgba(255, 215, 0, 0.5)',
-      fontWeight: '900',
-    },
-    2: {
-      backgroundColor: '#C0C0C0', // Argint
-      color: '#333',
-      fontWeight: '800',
-    },
-    3: {
-      backgroundColor: '#CD7F32', // Bronz
-      color: '#fff',
-      fontWeight: '800',
-    },
-  },
-  standardRank: {
-    backgroundColor: '#f9f9f9',
-    color: '#555',
-    border: '1px solid #eee',
-  },
-  playerName: {
-    textAlign: 'left' as 'left',
-    flexGrow: 1,
-    marginLeft: '15px',
-  },
-  score: {
-    fontWeight: '900',
-    color: '#008000',
-    fontSize: '1.4rem',
-  },
-  rankNumber: {
-    width: '30px',
-    fontWeight: '900',
-    fontSize: '1.5rem',
-    textAlign: 'center' as 'center',
-  }
+interface ScoreboardProps {
+  players: Player[];
+  onBackToLobby?: () => void;
+}
+
+const RANK_STYLES: Record<number, string> = {
+  1: "from-yellow-400/90 via-amber-500/80 to-yellow-600/80 text-slate-900",
+  2: "from-slate-200/80 via-slate-100/70 to-slate-300/60 text-slate-900",
+  3: "from-amber-700/80 via-orange-600/70 to-amber-800/60 text-white",
 };
-// -----------------------------
 
-
-export default function Scoreboard({ players }: { players: Player[] }) {
-  // Sortează descrescător după scor
+export default function Scoreboard({ players, onBackToLobby }: ScoreboardProps) {
   const sorted = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
 
   return (
-    <div style={styles.container}>
-      <h2 style={styles.title}>🏆 Clasament</h2>
-      
+    <div className="space-y-6 text-center text-slate-100">
+      <div>
+        <p className="app-pill mx-auto">Round results</p>
+        <h2 className="mt-4 text-3xl font-semibold">Scoreboard</h2>
+        <p className="text-sm text-slate-300">Fastest answers bubble to the top.</p>
+      </div>
+
       {sorted.length === 0 ? (
-        <div style={{ padding: '20px', color: '#888' }}>Așteptăm datele de scor.</div>
+        <div className="rounded-3xl border border-white/10 bg-white/5 px-6 py-10 text-slate-400">
+          Waiting for host to send the first scores…
+        </div>
       ) : (
-        <ol style={styles.list}>
-          {sorted.map((p, index) => {
+        <ol className="space-y-4">
+          {sorted.map((player, index) => {
             const rank = index + 1;
-            
-            // Determină stilul pe baza locului
-            const rankStyle = (styles.podium as any)[rank] || styles.standardRank;
-            
+            const gradient =
+              RANK_STYLES[rank] || "from-indigo-500/30 via-slate-800/60 to-slate-900/60 text-slate-100";
+
             return (
-              <li 
-                key={p.id} 
-                style={{ 
-                  ...styles.listItemBase,
-                  ...rankStyle,
-                }}
+              <li
+                key={player.id}
+                className={`flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-white/5 bg-gradient-to-r px-5 py-4 shadow-lg shadow-slate-900/40 ${gradient}`}
               >
-                <span style={styles.rankNumber}>
-                  {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}
-                </span>
-                
-                <span style={styles.playerName}>
-                  {p.name}
-                </span>
-                
-                <span style={{ 
-                    ...styles.score,
-                    color: rank <= 3 ? (rank === 3 ? '#fff' : '#333') : styles.score.color,
-                  }}
-                >
-                  {p.score ?? 0} p
-                </span>
+                <div className="flex items-center gap-4">
+                  <span className="text-2xl font-black">{rank}</span>
+                  <span className="text-lg font-semibold">{player.name}</span>
+                </div>
+                <span className="text-xl font-black">{player.score ?? 0} pts</span>
               </li>
             );
           })}
         </ol>
+      )}
+
+      {onBackToLobby && (
+        <button onClick={onBackToLobby} className="app-button mx-auto block">
+          Back to lobby
+        </button>
       )}
     </div>
   );

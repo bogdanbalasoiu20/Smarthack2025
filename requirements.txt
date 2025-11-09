@@ -5,3 +5,6 @@ mysql-connector-python
 daphne
 django-cors-headers
 anthropic
+python-pptx
+reportlab
+Pillow
