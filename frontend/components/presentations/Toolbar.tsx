@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Swal from 'sweetalert2';
 import {
   ArrowLeft,
-  Save,
   Share2,
   Play,
   Download,
@@ -13,11 +13,19 @@ import {
   Type,
   Square,
   Circle,
-  Image as ImageIcon,
 } from 'lucide-react';
 import { usePresentation } from '@/contexts/PresentationContext';
 
-export default function Toolbar() {
+const primaryButton =
+  'rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:scale-[1.01] hover:shadow-indigo-500/50';
+const subtleButton =
+  'p-2 text-slate-200/80 transition hover:text-white hover:bg-white/10 rounded-full';
+
+interface ToolbarProps {
+  onOpenShare?: () => void;
+}
+
+export default function Toolbar({ onOpenShare }: ToolbarProps) {
   const router = useRouter();
   const {
     presentation,
@@ -29,168 +37,159 @@ export default function Toolbar() {
 
   const handleSave = async () => {
     setSaving(true);
-    // Auto-save se întâmplă automat prin updates, dar putem forța o salvare
+    // Auto-save already runs in the background, but we surface a quick state change for feedback
     setTimeout(() => setSaving(false), 500);
   };
 
-  const addTextElement = () => {
+  const ensureEditableContext = () => {
     if (!selectedFrame || !canEdit) {
-      console.warn('Cannot add text: no frame selected or no edit permission');
-      alert('Please select a frame first and ensure you have edit permissions');
-      return;
+      Swal.fire({
+        icon: 'info',
+        title: 'Select a frame',
+        text: 'Choose a frame and make sure you have edit access before adding content.',
+        confirmButtonColor: '#6366f1',
+      });
+      return false;
     }
-
-    console.log('Adding text element to frame:', selectedFrame.id);
-
-    createElement(selectedFrame.id, {
-      element_type: 'TEXT',
-      position: JSON.stringify({
-        x: 100,
-        y: 100,
-        width: 400,
-        height: 100,
-        rotation: 0,
-        z_index: 1,
-      }),
-      content: JSON.stringify({
-        text: 'Text nou',
-        fontSize: 24,
-        fontFamily: 'Inter',
-        color: '#000000',
-        align: 'left',
-      }),
-      link_url: '',
-    }).then(() => {
-      console.log('Text element added successfully');
-    }).catch(err => {
-      console.error('Failed to add text element:', err);
-      alert('Failed to add text element. Check console for details.');
-    });
+    return true;
   };
 
-  const addShape = (shape: 'rectangle' | 'circle') => {
-    if (!selectedFrame || !canEdit) {
-      console.warn('Cannot add shape: no frame selected or no edit permission');
-      alert('Please select a frame first and ensure you have edit permissions');
-      return;
+  const addTextElement = async () => {
+    if (!ensureEditableContext()) return;
+
+    try {
+      await createElement(selectedFrame!.id, {
+        element_type: 'TEXT',
+        position: JSON.stringify({
+          x: 100,
+          y: 100,
+          width: 400,
+          height: 100,
+          rotation: 0,
+          z_index: 1,
+        }),
+        content: JSON.stringify({
+          text: 'New text block',
+          fontSize: 24,
+          fontFamily: 'Inter',
+          color: '#ffffff',
+          align: 'left',
+        }),
+        link_url: '',
+      });
+    } catch (error) {
+      console.error('Failed to add text element:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Could not add text',
+        text: 'Please try again or check the console for more details.',
+      });
     }
+  };
 
-    console.log(`Adding ${shape} to frame:`, selectedFrame.id);
+  const addShape = async (shape: 'rectangle' | 'circle') => {
+    if (!ensureEditableContext()) return;
 
-    createElement(selectedFrame.id, {
-      element_type: 'SHAPE',
-      position: JSON.stringify({
-        x: 150,
-        y: 150,
-        width: 200,
-        height: 200,
-        rotation: 0,
-        z_index: 1,
-      }),
-      content: JSON.stringify({
-        shape,
-        fill: '#3b82f6',
-        stroke: '#1e40af',
-        strokeWidth: 2,
-      }),
-      link_url: '',
-    }).then(() => {
-      console.log(`${shape} added successfully`);
-    }).catch(err => {
-      console.error(`Failed to add ${shape}:`, err);
-      alert(`Failed to add ${shape}. Check console for details.`);
-    });
+    try {
+      await createElement(selectedFrame!.id, {
+        element_type: 'SHAPE',
+        position: JSON.stringify({
+          x: 150,
+          y: 150,
+          width: 200,
+          height: 200,
+          rotation: 0,
+          z_index: 1,
+        }),
+        content: JSON.stringify({
+          shape,
+          fill: '#818cf8',
+          stroke: '#6366f1',
+          strokeWidth: 2,
+        }),
+        link_url: '',
+      });
+    } catch (error) {
+      console.error(`Failed to add ${shape}:`, error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Something went wrong',
+        text: `We could not add the ${shape}. Please try again.`,
+      });
+    }
   };
 
   return (
-    <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4">
-      {/* Left */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => router.push('/presentations')}
-          className="p-2 hover:bg-gray-100 rounded"
-        >
-          <ArrowLeft size={20} />
-        </button>
-
-        <div>
-          <h1 className="font-semibold text-gray-900 text-lg">
-            {presentation?.title || 'Loading...'}
-          </h1>
-          <p className="text-xs text-gray-500">
-            {saving ? 'Saving...' : 'Saved'}
-          </p>
+    <div className="rounded-[32px] border border-white/10 bg-white/5 px-6 py-4 text-white shadow-[0_40px_120px_rgba(3,7,18,0.65)] backdrop-blur-2xl">
+      <div className="flex items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => router.push('/presentations')}
+            className={`${subtleButton} border border-white/10`}
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Presentation</p>
+            <h1 className="text-2xl font-semibold text-white">
+              {presentation?.title || 'Loading...'}
+            </h1>
+            <p className="text-[11px] uppercase tracking-widest text-slate-400">
+              {saving ? 'Saving...' : 'Autosaved'}
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Center - Tools */}
-      {canEdit && (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={addTextElement}
-            className="p-2 hover:bg-gray-100 rounded flex items-center gap-2 text-sm"
-            title="Add text"
-          >
-            <Type size={18} />
-            <span className="hidden md:inline">Text</span>
-          </button>
+        {canEdit && (
+          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 shadow-inner shadow-white/5">
+            <button
+              onClick={addTextElement}
+              className="flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-white/80 transition hover:bg-white/10"
+            >
+              <Type size={16} />
+              Text
+            </button>
+            <span className="h-5 w-px bg-white/10" />
+            <button
+              onClick={() => addShape('rectangle')}
+              className={subtleButton}
+              title="Add rectangle"
+            >
+              <Square size={16} />
+            </button>
+            <button
+              onClick={() => addShape('circle')}
+              className={subtleButton}
+              title="Add circle"
+            >
+              <Circle size={16} />
+            </button>
+            <span className="h-5 w-px bg-white/10" />
+            <button className={subtleButton} title="Brand Kit">
+              <Palette size={16} />
+            </button>
+          </div>
+        )}
 
-          <button
-            onClick={() => addShape('rectangle')}
-            className="p-2 hover:bg-gray-100 rounded"
-            title="Add rectangle"
-          >
-            <Square size={18} />
-          </button>
-
-          <button
-            onClick={() => addShape('circle')}
-            className="p-2 hover:bg-gray-100 rounded"
-            title="Add circle"
-          >
-            <Circle size={18} />
-          </button>
-
-          <div className="w-px h-6 bg-gray-300 mx-2" />
-
-          <button className="p-2 hover:bg-gray-100 rounded" title="Brand Kit">
-            <Palette size={18} />
-          </button>
-        </div>
-      )}
-
-      {/* Right */}
-      <div className="flex items-center gap-2">
-        <button
-          className="p-2 hover:bg-gray-100 rounded"
-          title="Share"
-        >
+        <div className="flex items-center gap-3">
+        <button className={subtleButton} title="Share workspace" onClick={onOpenShare}>
           <Share2 size={18} />
         </button>
-
-        <button
-          className="p-2 hover:bg-gray-100 rounded"
-          title="Collaborators"
-        >
-          <Users size={18} />
-        </button>
-
-        <button
-          className="p-2 hover:bg-gray-100 rounded"
-          title="Download"
-        >
-          <Download size={18} />
-        </button>
-
-        <div className="w-px h-6 bg-gray-300 mx-2" />
-
-        <button
-          onClick={() => router.push(`/presentations/${presentation?.id}/present`)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <Play size={16} />
-          Present
-        </button>
+          <button className={subtleButton} title="Collaborators">
+            <Users size={18} />
+          </button>
+          <button className={subtleButton} title="Download">
+            <Download size={18} />
+          </button>
+          <div className="h-6 w-px bg-white/15" />
+          <button
+            onClick={() => router.push(`/presentations/${presentation?.id}/present`)}
+            className={`${primaryButton} flex items-center gap-2`}
+          >
+            <Play size={16} />
+            Present
+          </button>
+        </div>
       </div>
     </div>
   );

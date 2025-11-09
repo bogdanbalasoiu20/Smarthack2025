@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link"; // --- NOU --- Importăm componenta Link
+import Swal from "sweetalert2";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api";
@@ -860,7 +861,11 @@ const CreateCourseModal = ({ isOpen, onClose, onAddCourse }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!title) {
-      alert("Titlul cursului este obligatoriu.");
+      Swal.fire({
+        icon: "info",
+        title: "Title required",
+        text: "Please provide a course title before saving.",
+      });
       return;
     }
     onAddCourse({
@@ -1028,7 +1033,11 @@ const EditCourseModal = ({ isOpen, onClose, course, onSave, onDelete }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!title) {
-      alert("Titlul cursului este obligatoriu.");
+      Swal.fire({
+        icon: "info",
+        title: "Title required",
+        text: "Please provide a course title before publishing.",
+      });
       return;
     }
     onSave({

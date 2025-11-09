@@ -1,9 +1,51 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { getStoredToken } from '@/lib/authToken';
 import { API_BASE_URL, WS_BASE_URL } from '@/lib/api';
+
+type TransitionSettings = {
+  type: 'none' | 'fade' | 'slide' | 'zoom' | 'spin';
+  direction?: 'left' | 'right' | 'up' | 'down' | 'none';
+  duration: number;
+  delay: number;
+};
+
+type AnimationSettings = {
+  type: 'fade' | 'slide' | 'zoom' | 'bounce';
+  direction?: 'left' | 'right' | 'up' | 'down' | 'none';
+  duration: number;
+  delay: number;
+  easing: string;
+};
+
+const DEFAULT_TRANSITION_SETTINGS: TransitionSettings = {
+  type: 'fade',
+  direction: 'none',
+  duration: 0.8,
+  delay: 0,
+};
+
+const DEFAULT_ANIMATION_SETTINGS: AnimationSettings = {
+  type: 'fade',
+  direction: 'up',
+  duration: 0.8,
+  delay: 0,
+  easing: 'easeInOut',
+};
+
+interface RemoteUserState {
+  userId: number;
+  username: string;
+  color: string;
+  elementId: number | null;
+  frameId: number | null;
+  lastActive: number;
+}
+
+const USER_COLORS = ['#f87171', '#fb923c', '#facc15', '#34d399', '#38bdf8', '#a78bfa', '#f472b6'];
+const colorForUser = (userId: number) => USER_COLORS[userId % USER_COLORS.length];
 
 interface Frame {
   id: number;
@@ -20,6 +62,8 @@ interface Frame {
   background_image: string;
   order: number;
   elements: Element[];
+  transition_settings?: string;
+  transition_settings_parsed?: TransitionSettings;
 }
 
 interface Element {
@@ -36,6 +80,8 @@ interface Element {
   };
   content: string;
   content_parsed: any;
+  animation_settings?: string;
+  animation_settings_parsed?: AnimationSettings;
   link_url: string;
   frame?: number;
   created_at?: string;
@@ -76,6 +122,8 @@ interface PresentationContextType {
   deleteElement: (elementId: number) => Promise<void>;
   refreshPresentation: () => Promise<void>;
   canEdit: boolean;
+  remoteUsers: RemoteUserState[];
+  announceSelection: (frameId: number | null, elementId: number | null) => void;
 }
 
 interface ElementUpdateOptions {
@@ -97,9 +145,13 @@ export function PresentationProvider({
   const [loading, setLoading] = useState(true);
   const [selectedFrame, setSelectedFrame] = useState<Frame | null>(null);
   const [selectedElement, setSelectedElement] = useState<Element | null>(null);
+  const [remoteUsersMap, setRemoteUsersMap] = useState<Record<number, RemoteUserState>>({});
 
   const token = getStoredToken();
-  const mergeElementData = (element: Element, changes: Partial<Element>): Element => {
+  useEffect(() => {
+    setRemoteUsersMap({});
+  }, [presentationId]);
+const mergeElementData = (element: Element, changes: Partial<Element>): Element => {
     const next: Element = { ...element, ...changes };
 
     if (typeof changes.position === 'string') {
@@ -118,8 +170,42 @@ export function PresentationProvider({
       }
     }
 
+    if (typeof changes.animation_settings === 'string') {
+      try {
+        next.animation_settings_parsed = JSON.parse(changes.animation_settings);
+      } catch {
+        next.animation_settings_parsed = DEFAULT_ANIMATION_SETTINGS;
+      }
+    } else if (typeof changes.animation_settings === 'object' && changes.animation_settings) {
+      next.animation_settings_parsed = changes.animation_settings as AnimationSettings;
+    }
+
     return next;
   };
+
+  const mergeFrameData = useCallback((frame: Frame, changes: Partial<Frame>): Frame => {
+    const next: Frame = { ...frame, ...changes };
+
+    if (typeof changes.position === 'string') {
+      try {
+        next.position_parsed = JSON.parse(changes.position);
+      } catch {
+        // keep previous parsed
+      }
+    }
+
+    if (typeof changes.transition_settings === 'string') {
+      try {
+        next.transition_settings_parsed = JSON.parse(changes.transition_settings);
+      } catch {
+        next.transition_settings_parsed = DEFAULT_TRANSITION_SETTINGS;
+      }
+    } else if (typeof changes.transition_settings === 'object' && changes.transition_settings) {
+      next.transition_settings_parsed = changes.transition_settings as TransitionSettings;
+    }
+
+    return next;
+  }, []);
 
   const applyElementChangesLocal = useCallback((elementId: number, changes: Partial<Element>) => {
     setPresentation((prev) => {
@@ -160,7 +246,60 @@ export function PresentationProvider({
     );
   }, [mergeElementData]);
 
+  const registerRemoteUser = useCallback((userId: number, username: string) => {
+    setRemoteUsersMap((prev) => {
+      const existing = prev[userId];
+      if (existing) {
+        if (existing.username === username) {
+          return prev;
+        }
+        return {
+          ...prev,
+          [userId]: {
+            ...existing,
+            username,
+          },
+        };
+      }
+      return {
+        ...prev,
+        [userId]: {
+          userId,
+          username,
+          color: colorForUser(userId),
+          elementId: null,
+          frameId: null,
+          lastActive: Date.now(),
+        },
+      };
+    });
+  }, []);
+
+  const removeRemoteUser = useCallback((userId: number) => {
+    setRemoteUsersMap((prev) => {
+      if (!(userId in prev)) return prev;
+      const next = { ...prev };
+      delete next[userId];
+      return next;
+    });
+  }, []);
+
   const addElementLocal = useCallback((frameId: number, element: Element) => {
+    const hydrated: Element = {
+      ...element,
+      animation_settings_parsed:
+        element.animation_settings_parsed ??
+        (element.animation_settings
+          ? (() => {
+              try {
+                return JSON.parse(element.animation_settings);
+              } catch {
+                return DEFAULT_ANIMATION_SETTINGS;
+              }
+            })()
+          : DEFAULT_ANIMATION_SETTINGS),
+    };
+
     setPresentation((prev) => {
       if (!prev) return prev;
       return {
@@ -169,7 +308,7 @@ export function PresentationProvider({
           frame.id === frameId
             ? {
                 ...frame,
-                elements: [...(frame.elements || []), element],
+                elements: [...(frame.elements || []), hydrated],
               }
             : frame
         ),
@@ -183,11 +322,11 @@ export function PresentationProvider({
 
       return {
         ...prevFrame,
-        elements: [...(prevFrame.elements || []), element],
+        elements: [...(prevFrame.elements || []), hydrated],
       };
     });
 
-    setSelectedElement(element);
+    setSelectedElement(hydrated);
   }, []);
 
   const removeElementLocal = useCallback((elementId: number) => {
@@ -231,6 +370,17 @@ export function PresentationProvider({
         handleWebSocketMessage(data);
       },
     }
+  );
+
+  const announceSelection = useCallback(
+    (frameId: number | null, elementId: number | null) => {
+      sendMessage({
+        type: 'user_selection',
+        frame_id: frameId,
+        element_id: elementId,
+      });
+    },
+    [sendMessage]
   );
 
   const canEdit = presentation?.current_user_permission === 'OWNER' ||
@@ -289,18 +439,52 @@ export function PresentationProvider({
           return {
             ...prev,
             frames: prev.frames.map((frame) =>
-              frame.id === data.frame_id ? { ...frame, ...data.changes } : frame
+              frame.id === data.frame_id ? mergeFrameData(frame, data.changes) : frame
             ),
           };
+        });
+        setSelectedFrame((prev) => {
+          if (!prev || prev.id !== data.frame_id) return prev;
+          return mergeFrameData(prev, data.changes);
         });
         break;
 
       case 'user_joined':
-        console.log(`${data.username} joined`);
+        if (data.user_id && data.username) {
+          registerRemoteUser(data.user_id, data.username);
+        }
         break;
 
       case 'user_left':
-        console.log(`${data.username} left`);
+        if (data.user_id) {
+          removeRemoteUser(data.user_id);
+        }
+        break;
+
+      case 'user_selection':
+        if (data.user_id) {
+          registerRemoteUser(data.user_id, data.username || 'Guest');
+          setRemoteUsersMap((prev) => {
+            const existing = prev[data.user_id] || {
+              userId: data.user_id,
+              username: data.username || 'Guest',
+              color: colorForUser(data.user_id),
+              elementId: null,
+              frameId: null,
+              lastActive: Date.now(),
+            };
+            return {
+              ...prev,
+              [data.user_id]: {
+                ...existing,
+                username: data.username || existing.username,
+                elementId: data.element_id ?? null,
+                frameId: data.frame_id ?? null,
+                lastActive: Date.now(),
+              },
+            };
+          });
+        }
         break;
     }
   };
@@ -309,32 +493,36 @@ export function PresentationProvider({
     if (!canEdit) return;
 
     try {
+      const payload = { ...data };
       const response = await fetch(`${API_BASE_URL}/frames/${frameId}/`, {
         method: 'PATCH',
         headers: {
           Authorization: `Token ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
-        // Broadcast prin WebSocket
         sendMessage({
           type: 'frame_update',
           frame_id: frameId,
-          changes: data,
+          changes: payload,
         });
 
-        // Actualizează local
         setPresentation((prev) => {
           if (!prev) return prev;
           return {
             ...prev,
             frames: prev.frames.map((frame) =>
-              frame.id === frameId ? { ...frame, ...data } : frame
+              frame.id === frameId ? mergeFrameData(frame, payload) : frame
             ),
           };
+        });
+
+        setSelectedFrame((prev) => {
+          if (!prev || prev.id !== frameId) return prev;
+          return mergeFrameData(prev, payload);
         });
       }
     } catch (error) {
@@ -389,16 +577,20 @@ export function PresentationProvider({
     if (!canEdit) return;
 
     try {
+      const payload: Record<string, unknown> = {
+        presentation: presentationId,
+        ...data,
+      };
+      if (!payload.transition_settings) {
+        payload.transition_settings = JSON.stringify(DEFAULT_TRANSITION_SETTINGS);
+      }
       const response = await fetch(`${API_BASE_URL}/frames/`, {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          presentation: presentationId,
-          ...data,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
@@ -415,15 +607,15 @@ export function PresentationProvider({
       return;
     }
 
-    console.log('Creating element:', { frameId, data });
-
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         frame: frameId,
         ...data,
       };
 
-      console.log('Sending payload:', payload);
+      if (!payload.animation_settings) {
+        payload.animation_settings = JSON.stringify(DEFAULT_ANIMATION_SETTINGS);
+      }
 
       const response = await fetch(`${API_BASE_URL}/elements/`, {
         method: 'POST',
@@ -434,20 +626,17 @@ export function PresentationProvider({
         body: JSON.stringify(payload),
       });
 
-      const responseText = await response.text();
-      console.log('Response status:', response.status);
-      console.log('Response text:', responseText);
-
       if (response.ok) {
-        const element = JSON.parse(responseText);
-        console.log('Element created successfully:', element);
+        const element = await response.json();
         const targetFrameId = element.frame || frameId;
         addElementLocal(targetFrameId, element);
+        announceSelection(targetFrameId, element.id);
         sendMessage({
           type: 'element_create',
           element,
         });
       } else {
+        const responseText = await response.text();
         console.error('Failed to create element:', response.status, responseText);
       }
     } catch (error) {
@@ -493,6 +682,8 @@ export function PresentationProvider({
     }
   };
 
+  const remoteUsers = useMemo(() => Object.values(remoteUsersMap), [remoteUsersMap]);
+
   return (
     <PresentationContext.Provider
       value={{
@@ -510,6 +701,8 @@ export function PresentationProvider({
         deleteElement,
         refreshPresentation: fetchPresentation,
         canEdit,
+        remoteUsers,
+        announceSelection,
       }}
     >
       {children}

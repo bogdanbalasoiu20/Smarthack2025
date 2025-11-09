@@ -21,8 +21,9 @@ from .presentation_serializers import (
     PresentationSerializer, PresentationMinimalSerializer, PresentationAccessSerializer,
     FrameSerializer, FrameMinimalSerializer, FrameConnectionSerializer,
     ElementSerializer, CommentSerializer, PresentationVersionSerializer,
-    RecordingSerializer
+    RecordingSerializer, UserMinimalSerializer
 )
+from .ai_service import PresentationAIService
 
 
 # ===== PERMISIUNI CUSTOM =====
@@ -297,6 +298,77 @@ class PresentationViewSet(viewsets.ModelViewSet):
         version_serializer = PresentationVersionSerializer(version)
         return Response(version_serializer.data, status=status.HTTP_201_CREATED)
 
+    @action(detail=True, methods=['get', 'post', 'delete'], permission_classes=[IsAuthenticated], url_path='collaborators')
+    def collaborators(self, request, pk=None):
+        """List/modify collaborators for a presentation"""
+        presentation = self.get_object()
+
+        if request.method == 'GET':
+            serializer = PresentationAccessSerializer(
+                presentation.access_grants.select_related('user', 'granted_by'),
+                many=True,
+                context={'request': request}
+            )
+            owner_payload = UserMinimalSerializer(presentation.owner).data
+            return Response({
+                'owner': owner_payload,
+                'collaborators': serializer.data
+            })
+
+        if presentation.owner != request.user:
+            return Response({'error': 'Only the owner can manage collaborators'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        if request.method == 'POST':
+            email = (request.data.get('email') or '').strip()
+            permission = (request.data.get('permission') or 'VIEWER').upper()
+            if permission not in ['VIEWER', 'EDITOR']:
+                permission = 'VIEWER'
+
+            if not email:
+                return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            user = User.objects.filter(
+                Q(email__iexact=email) | Q(username__iexact=email)
+            ).first()
+
+            if not user:
+                return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            if user == presentation.owner:
+                return Response({'error': 'Owner already has full access'}, status=status.HTTP_400_BAD_REQUEST)
+
+            access, created = PresentationAccess.objects.update_or_create(
+                presentation=presentation,
+                user=user,
+                defaults={
+                    'permission': permission,
+                    'granted_by': request.user,
+                    'granted_at': timezone.now(),
+                }
+            )
+
+            serializer = PresentationAccessSerializer(access, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+        # DELETE
+        access_id = request.data.get('access_id')
+        user_id = request.data.get('user_id')
+
+        qs = PresentationAccess.objects.filter(presentation=presentation)
+        if access_id:
+            qs = qs.filter(id=access_id)
+        elif user_id:
+            qs = qs.filter(user_id=user_id)
+        else:
+            return Response({'error': 'access_id or user_id required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        deleted, _ = qs.delete()
+        if not deleted:
+            return Response({'error': 'Collaborator not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 # ===== PRESENTATION ACCESS =====
 class PresentationAccessViewSet(viewsets.ModelViewSet):
@@ -521,20 +593,35 @@ def ai_rewrite_text(request):
         "mode": "shorter" | "longer" | "professional" | "casual"
     }
     """
-    text = request.data.get('text', '')
+    text = request.data.get('text', '').strip()
     mode = request.data.get('mode', 'professional')
 
-    # TODO: Integrare AI_CLIENT
-    prompt = f"Rescrie următorul text într-un stil {mode}: {text}"
+    if not text:
+        return Response(
+            {'error': 'Text is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-    # MOCK
-    mock_result = f"[{mode.upper()}] {text}"
+    try:
+        ai_service = PresentationAIService()
+        rewritten = ai_service.enhance_slide_content(text, style=mode)
 
-    return Response({
-        'original': text,
-        'rewritten': mock_result,
-        'mode': mode
-    })
+        return Response({
+            'original': text,
+            'rewritten': rewritten,
+            'mode': mode
+        })
+
+    except ValueError as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to rewrite text: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(['POST'])
@@ -556,16 +643,209 @@ def ai_suggest_visuals(request):
         ]
     }
     """
-    text = request.data.get('text', '')
+    text = request.data.get('text', '').strip()
 
-    # TODO: AI_CLIENT
-    # MOCK
-    suggestions = [
-        {"type": "icon", "keyword": "presentation", "relevance": 0.9},
-        {"type": "image", "keyword": "teamwork", "relevance": 0.7}
-    ]
+    if not text:
+        return Response(
+            {'error': 'Text is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-    return Response({'suggestions': suggestions})
+    try:
+        ai_service = PresentationAIService()
+        suggestions = ai_service.suggest_visuals(text)
+
+        return Response({'suggestions': suggestions})
+
+    except ValueError as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to suggest visuals: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def ai_get_slide_advice(request):
+    """
+    Get AI advice for improving a slide.
+
+    Input:
+    {
+        "slide_content": "text content of the slide",
+        "context": "optional presentation context"
+    }
+
+    Output:
+    {
+        "overall_score": 8,
+        "strengths": ["Clear message", "Good structure"],
+        "improvements": ["Add more visuals", "Reduce text"],
+        "content_advice": "...",
+        "design_advice": "...",
+        "quick_wins": ["Increase font size", "Add bullet points"]
+    }
+    """
+    slide_content = request.data.get('slide_content', '').strip()
+    context = request.data.get('context', '')
+
+    if not slide_content:
+        return Response(
+            {'error': 'Slide content is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        ai_service = PresentationAIService()
+        advice = ai_service.give_slide_advice(slide_content, context)
+
+        return Response(advice)
+
+    except ValueError as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to get slide advice: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def ai_generate_full_presentation(request):
+    """
+    Generate a complete presentation from a user prompt using AI.
+
+    Input:
+    {
+        "prompt": "Create a presentation about climate change solutions",
+        "num_slides": 7  // optional
+    }
+
+    Output:
+    {
+        "presentation_id": 123,
+        "title": "Climate Change Solutions",
+        "num_frames": 7,
+        "message": "Presentation generated successfully"
+    }
+    """
+    prompt = request.data.get('prompt', '').strip()
+    num_slides = request.data.get('num_slides', None)
+
+    if not prompt:
+        return Response(
+            {'error': 'Prompt is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        # Initialize AI service
+        ai_service = PresentationAIService()
+
+        # Generate presentation structure
+        presentation_data = ai_service.generate_presentation_structure(
+            prompt=prompt,
+            num_slides=num_slides
+        )
+
+        # Create presentation in database
+        now = timezone.now()
+        presentation = Presentation.objects.create(
+            owner=request.user,
+            title=presentation_data['title'],
+            description=presentation_data.get('description', ''),
+            canvas_settings=json.dumps({
+                'zoom': 1.0,
+                'viewport': {'x': 0, 'y': 0},
+                'background': '#ffffff'
+            }),
+            presentation_path=json.dumps([]),
+            share_token=secrets.token_urlsafe(32),
+            is_public=0,
+            thumbnail_url='',
+            created_at=now,
+            updated_at=now
+        )
+
+        # Create frames and elements
+        frame_ids = []
+        for frame_data in presentation_data['frames']:
+            # Create frame
+            frame = Frame.objects.create(
+                presentation=presentation,
+                title=frame_data.get('title', f"Slide {frame_data['order'] + 1}"),
+                order=frame_data['order'],
+                background_color=frame_data.get('background_color', '#ffffff'),
+                background_image='',
+                position=json.dumps({
+                    'x': 0,
+                    'y': 0,
+                    'width': 1920,
+                    'height': 1080,
+                    'rotation': 0
+                }),
+                transition_settings=json.dumps({
+                    'type': 'fade',
+                    'duration': 0.8,
+                    'delay': 0,
+                    'direction': 'none'
+                }),
+                thumbnail_url='',
+                created_at=now,
+                updated_at=now
+            )
+
+            frame_ids.append(frame.id)
+
+            # Create elements for this frame
+            for element_data in frame_data.get('elements', []):
+                Element.objects.create(
+                    frame=frame,
+                    element_type=element_data['type'],
+                    position=json.dumps(element_data['position']),
+                    content=json.dumps(element_data['content']),
+                    animation_settings=json.dumps({
+                        'type': 'fade',
+                        'duration': 0.8,
+                        'delay': 0,
+                        'easing': 'easeInOut',
+                        'direction': 'up'
+                    }),
+                    link_url='',
+                    created_at=now,
+                    updated_at=now
+                )
+
+        # Update presentation path with frame IDs
+        presentation.presentation_path = json.dumps(frame_ids)
+        presentation.save()
+
+        return Response({
+            'presentation_id': presentation.id,
+            'title': presentation.title,
+            'num_frames': len(frame_ids),
+            'message': 'Presentation generated successfully'
+        }, status=status.HTTP_201_CREATED)
+
+    except ValueError as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to generate presentation: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 # ===== EXPORT PDF/IMAGES =====
