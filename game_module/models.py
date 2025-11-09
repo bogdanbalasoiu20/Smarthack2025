@@ -32,11 +32,12 @@ class GameSession(models.Model):
     pin = models.CharField(max_length=6, unique=True, db_index=True) 
     
     STATUS_CHOICES = [
-        ('lobby', 'Lobby'),
-        ('running', 'Running'),
-        ('finished', 'Finished'),
-    ]
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='lobby')
+    ('lobby', 'Lobby'),
+    ('running', 'Running'), # Întrebare activă
+    ('score_display', 'Score Display'), # Afișare clasament intermediar
+    ('finished', 'Finished'),
+]
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='lobby')
     
     current_question = models.ForeignKey('Question', on_delete=models.SET_NULL, null=True, blank=True)
     

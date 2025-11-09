@@ -22,6 +22,6 @@ def home(request):
 
 urlpatterns = [
     path('', home),
-    path('api/', include('api.urls')),
     path('api/games/', include('game_module.urls')),
+    path('api/', include('api.urls')),
 ]

@@ -102,7 +102,7 @@ CHANNEL_LAYERS = {
 
 DATABASES = {
     'default': {
-        'ENGINE': 'mysql.connector.django',
+        'ENGINE': 'django.db.backends.mysql',
         'NAME': 'smarthack2025',
         'USER': 'django_user',
         'PASSWORD': 'django_pass',
