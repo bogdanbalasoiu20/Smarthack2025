@@ -159,15 +159,13 @@ export default function CreateGamePage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Check authentication on mount
     useEffect(() => {
         const token = getStoredToken();
         if (!token) {
             router.replace('/login');
         }
     }, [router]);
-    
-    // --- Funcționalitatea rămâne neschimbată ---
+
     const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setGame(prev => ({ ...prev, title: e.target.value }));
     }, []);
@@ -257,69 +255,185 @@ export default function CreateGamePage() {
         }
     };
 
-    // Aplicarea stilului disabled condițional
-    const saveButtonStyles = {
-        ...styles.saveButton,
-        ...(loading || game.questions.length === 0 ? styles.disabledSaveButton : {}),
-    };
-
+    const totalQuestions = game.questions.length;
+    const avgTime = totalQuestions
+        ? Math.round(
+            game.questions.reduce((sum, q) => sum + q.timeLimit, 0) / totalQuestions
+          )
+        : 0;
+    const disableSave =
+        loading || totalQuestions === 0 || game.title.trim().length === 0;
 
     if (!isMounted) {
-        return <div style={{padding: 50, textAlign: 'center'}}>Se încarcă formularul...</div>;
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-200">
+                Se încarcă studio-ul de quiz...
+            </div>
+        );
     }
 
-
     return (
-        <div style={{ backgroundColor: COLORS.neutralBg, minHeight: '100vh', padding: '1px 0' }}>
-            <div style={styles.container}>
-                <h2 style={styles.header}>Kahoot Time</h2>
-                
-                <div style={styles.inputGroup}>
-                    <label style={styles.label} htmlFor="game-title">TITLU JOC</label>
-                    <input
-                        id="game-title"
-                        value={game.title}
-                        onChange={handleTitleChange}
-                        style={styles.input as React.CSSProperties}
-                        placeholder="Ex: Quiz de Geografie - Capitolul 1"
-                    />
-                </div>
+        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white">
+            <div className="app-page">
+                <div className="game-shell">
+                    <header className="flex flex-col gap-6 rounded-[32px] border border-white/10 bg-white/5 p-8 text-white shadow-[0_40px_120px_rgba(2,6,23,0.65)] backdrop-blur-2xl lg:flex-row lg:items-center lg:justify-between">
+                        <div className="space-y-3">
+                            <p className="app-pill">Teachium quiz studio</p>
+                            <h1 className="text-4xl font-semibold">Build a Kahoot-style game</h1>
+                            <p className="text-sm text-slate-300">
+                                Turn your lesson into a fast-paced challenge. Draft questions, set timers,
+                                and save once you are happy with the deck.
+                            </p>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-3">
+                            <StatCard label="Questions" value={totalQuestions.toString()} footer="min. 1 required" />
+                            <StatCard label="Avg. Timer" value={`${avgTime || 20}s`} footer="per slide" />
+                            <StatCard label="Status" value={disableSave ? 'Draft' : 'Ready'} footer="save when ready" />
+                        </div>
+                    </header>
 
-                <h3 style={{ fontSize: '1.4rem', marginBottom: '20px', fontWeight: '600', color: COLORS.darkText }}>
-                    Intrebari ({game.questions.length})
-                </h3>
+                    <div className="grid gap-6 lg:grid-cols-[2.1fr,0.9fr]">
+                        <section className="space-y-6 rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_35px_120px_rgba(2,6,23,0.5)] backdrop-blur-2xl">
+                            <div className="space-y-4">
+                                <label className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
+                                    Game title
+                                </label>
+                                <input
+                                    id="game-title"
+                                    value={game.title}
+                                    onChange={handleTitleChange}
+                                    placeholder="Ex: Geografie Europa - capitolul 1"
+                                    className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-lg text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none"
+                                />
+                            </div>
 
-                {game.questions.map((q, index) => (
-                    <div key={q.id} style={styles.questionCard}>
-                        <h4 style={styles.questionHeader}>Întrebarea #{index + 1}</h4>
-                        <QuestionEditor 
-                            question={q}
-                            onChange={(updatedFields) => updateQuestion(q.id, updatedFields)}
-                        />
-                        <button 
-                            onClick={() => removeQuestion(q.id)} 
-                            style={styles.removeButton as React.CSSProperties}
-                        >
-                            Sterge Intrebarea
-                        </button>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Question bank</p>
+                                    <h3 className="text-xl font-semibold">Întrebări ({totalQuestions})</h3>
+                                </div>
+                                <button
+                                    onClick={addQuestion}
+                                    className="flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/40"
+                                >
+                                    + Adaugă întrebare
+                                </button>
+                            </div>
+
+                            {game.questions.length === 0 ? (
+                                <div className="rounded-3xl border border-dashed border-white/15 p-10 text-center text-sm text-slate-400">
+                                    Nicio întrebare încă. Apasă „Adaugă întrebare” pentru a începe.
+                                </div>
+                            ) : (
+                                <div className="space-y-5">
+                                    {game.questions.map((q, index) => (
+                                        <article
+                                            key={q.id}
+                                            className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-inner shadow-white/5"
+                                        >
+                                            <header className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-xs uppercase tracking-[0.35em] text-slate-500">
+                                                        Întrebarea #{index + 1}
+                                                    </p>
+                                                    <h4 className="text-lg font-semibold">{q.text || 'Completează întrebarea'}</h4>
+                                                </div>
+                                                <button
+                                                    onClick={() => removeQuestion(q.id)}
+                                                    className="rounded-full border border-red-500/40 px-3 py-1 text-xs font-semibold text-red-200 transition hover:border-red-400/90 hover:text-white"
+                                                >
+                                                    Șterge
+                                                </button>
+                                            </header>
+
+                                            <div className="mt-4 rounded-2xl border border-white/10 bg-slate-900/30 p-4">
+                                                <QuestionEditor
+                                                    question={q}
+                                                    onChange={(updatedFields) => updateQuestion(q.id, updatedFields)}
+                                                />
+                                            </div>
+                                        </article>
+                                    ))}
+                                </div>
+                            )}
+
+                            {error && (
+                                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                                    {error}
+                                </div>
+                            )}
+
+                            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={disableSave}
+                                    className={`app-button w-full justify-center sm:w-auto ${
+                                        disableSave ? 'opacity-50' : ''
+                                    }`}
+                                >
+                                    {loading ? 'Se salvează...' : 'Salvează jocul'}
+                                </button>
+                            </div>
+                        </section>
+
+                        <aside className="space-y-6">
+                            <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_25px_80px_rgba(2,6,23,0.45)] backdrop-blur-2xl">
+                                <h3 className="text-lg font-semibold">Checklist rapid</h3>
+                                <ul className="mt-4 space-y-3 text-sm text-slate-200">
+                                    <ChecklistItem checked={game.title.trim().length > 0} label="Titlu adăugat" />
+                                    <ChecklistItem checked={totalQuestions > 0} label="Cel puțin o întrebare" />
+                                    <ChecklistItem
+                                        checked={game.questions.every(q => q.options.some(opt => opt.isCorrect))}
+                                        label="Răspuns corect definit"
+                                    />
+                                    <ChecklistItem
+                                        checked={game.questions.every(q => q.timeLimit > 0)}
+                                        label="Timp setat pentru fiecare întrebare"
+                                    />
+                                </ul>
+                            </div>
+
+                            <div className="rounded-[32px] border border-white/10 bg-gradient-to-br from-indigo-500/40 via-purple-500/30 to-pink-500/30 p-6 shadow-[0_25px_80px_rgba(2,6,23,0.45)] backdrop-blur-2xl">
+                                <p className="text-xs uppercase tracking-[0.35em] text-white/70">Tip</p>
+                                <h4 className="mt-2 text-xl font-semibold text-white">
+                                    Păstrează întrebările concise
+                                </h4>
+                                <p className="mt-3 text-sm text-white/80">
+                                    Elevii citesc pe telefoane. Încearcă să păstrezi 80-120 de caractere și oferă
+                                    un singur răspuns corect clar.
+                                </p>
+                            </div>
+                        </aside>
                     </div>
-                ))}
-
-                <button onClick={addQuestion} style={styles.addButton as React.CSSProperties}>
-                    + Adauga Intrebare Noua
-                </button>
-
-                {error && <div style={styles.error}>{error}</div>}
-                
-                <button 
-                    onClick={handleSubmit} 
-                    style={saveButtonStyles as React.CSSProperties}
-                    disabled={loading || game.questions.length === 0}
-                >
-                    {loading ? 'Se Salveaza..' : 'Salveaza Jocul Complet'}
-                </button>
-                
+                </div>
             </div>
         </div>
+    );
+}
+
+function StatCard({ label, value, footer }: { label: string; value: string; footer: string }) {
+    return (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center">
+            <p className="text-xs uppercase tracking-[0.35em] text-slate-400">{label}</p>
+            <p className="mt-2 text-2xl font-semibold">{value}</p>
+            <p className="text-[11px] uppercase tracking-widest text-slate-500">{footer}</p>
+        </div>
+    );
+}
+
+function ChecklistItem({ checked, label }: { checked: boolean; label: string }) {
+    return (
+        <li className="flex items-center gap-2">
+            <span
+                className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-xs ${
+                    checked
+                        ? 'border-emerald-400 bg-emerald-400/20 text-emerald-100'
+                        : 'border-white/20 text-white/50'
+                }`}
+            >
+                {checked ? '✓' : '•'}
+            </span>
+            <span className={checked ? 'text-white' : 'text-slate-400'}>{label}</span>
+        </li>
     );
 }
