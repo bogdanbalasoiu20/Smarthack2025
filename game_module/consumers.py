@@ -355,6 +355,18 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
         """Helper to update session status in sync context."""
         self.session.status = status
         self.session.save()
+
+    def _get_current_question_payload(self):
+        """Serialize current question data within a sync context."""
+        question = self.session.current_question
+        if not question:
+            return None
+
+        serialized_question = QuestionSerializer(question).data
+        return {
+            'question': serialized_question,
+            'time_limit': question.time_limit
+        }
         
         
     # ----------------------------------------------------
@@ -378,14 +390,11 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
                 })
             elif self.session.status == 'running':
                 # Game is active, send current question
-                if self.session.current_question:
-                    q_data = await sync_to_async(lambda: QuestionSerializer(self.session.current_question).data)()
+                question_payload = await sync_to_async(self._get_current_question_payload)()
+                if question_payload:
                     await self.send_json({
                         'type': 'question',
-                        'payload': {
-                            'question': q_data,
-                            'time_limit': self.session.current_question.time_limit
-                        }
+                        'payload': question_payload
                     })
                 else:
                     # No current question, send lobby state
