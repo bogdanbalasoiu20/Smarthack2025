@@ -1,5 +1,6 @@
 "use client";
 
+import type { SVGProps } from "react";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -20,35 +21,24 @@ type LoginResponse = {
   };
 };
 
-// --- Iconițe SVG ---
-// Am înlocuit UserIcon și LockIcon cu variantele SVG de la FontAwesome,
-// conform solicitării tale.
-
-const CircleUserIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 512 512"
-    fill="currentColor" // FontAwesome folosește 'fill' în loc de 'stroke' pentru aceste iconițe
-    {...props}
-  >
-    {/* path pentru fa-circle-user */}
-    <path d="M399 384.2C376.9 345.8 335.4 320 288 320H224c-47.4 0-88.9 25.8-111 64.2c35.2 39.2 86.2 63.8 143 63.8s107.8-24.7 143-63.8zM0 256a256 256 0 1 1 512 0A256 256 0 1 1 0 256zm256 16a72 72 0 1 0 0-144 72 72 0 1 0 0 144z" />
-  </svg>
-);
-
-const KeyIcon = (props: React.SVGProps<SVGSVGElement>) => (
+const CircleUserIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 512 512"
     fill="currentColor"
     {...props}
   >
-    {/* path pentru fa-key */}
+    <path d="M399 384.2C376.9 345.8 335.4 320 288 320H224c-47.4 0-88.9 25.8-111 64.2c35.2 39.2 86.2 63.8 143 63.8s107.8-24.7 143-63.8zM0 256a256 256 0 1 1 512 0A256 256 0 1 1 0 256zm256 16a72 72 0 1 0 0-144 72 72 0 1 0 0 144z" />
+  </svg>
+);
+
+const KeyIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor" {...props}>
     <path d="M336 352c97.2 0 176-78.8 176-176S433.2 0 336 0S160 78.8 160 176c0 18.7 2.9 36.8 8.3 53.7L7 391c-4.5 4.5-7 10.6-7 17v80c0 13.3 10.7 24 24 24h80c13.3 0 24-10.7 24-24V432c0-6.4 2.5-12.5 7-17l199.7-199.7c16.9 5.4 35 8.3 53.7 8.3zM376 176c-26.5 0-48-21.5-48-48s21.5-48 48-48s48 21.5 48 48s-21.5 48-48 48z" />
   </svg>
 );
 
-const EyeIcon = (props: React.SVGProps<SVGSVGElement>) => (
+const EyeIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width="24"
@@ -66,7 +56,7 @@ const EyeIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-const EyeOffIcon = (props: React.SVGProps<SVGSVGElement>) => (
+const EyeOffIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width="24"
@@ -79,19 +69,17 @@ const EyeOffIcon = (props: React.SVGProps<SVGSVGElement>) => (
     strokeLinejoin="round"
     {...props}
   >
-    <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
-    <path d="M10.73 10.73C12.55 12.55 15.22 14 18 14c4 0 7-3 7-3s-1-2-3-4" />
-    <path d="M3 14s1-2 3-4c1.1.9 2.3 1.5 3.5 1.9" />
-    <path d="M1 1l22 22" />
-    <path d="M2.5 2.5C4.32 4.32 6.99 6 10 6c4 0 7-3 7-3" />
+    <path d="m2 2 20 20" />
+    <path d="M9.5 9.5a3 3 0 1 0 5 5" />
+    <path d="M14.53 14.53A10.94 10.94 0 0 1 12 15c-7 0-11-3-11-3a16.9 16.9 0 0 1 5.06-4.58" />
+    <path d="M17.73 9.35A10.46 10.46 0 0 1 23 12s-4 3-11 3a13.76 13.76 0 0 1-2.82-.3" />
   </svg>
 );
-// --- Sfârșit Iconițe SVG ---
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false); // Stare pentru a comuta vizibilitatea parolei
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -104,13 +92,8 @@ export default function LoginPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/login/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username,
-          password,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
       });
 
       const data: LoginResponse = await response.json();
@@ -129,6 +112,7 @@ export default function LoginPage() {
         } else {
           localStorage.removeItem("userRole");
         }
+
         if (data.user) {
           const fullName = `${data.user.first_name ?? ""} ${
             data.user.last_name ?? ""
@@ -140,26 +124,26 @@ export default function LoginPage() {
             fullName.length > 0 ? fullName : data.user.username
           );
         }
+
         router.push("/dashboard");
       } else {
         setError(data.message || "Login failed. Please try again.");
       }
     } catch (err) {
-      setError("An error occurred. Please try again.");
       console.error("Login error:", err);
+      setError("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 p-8 sm:p-12 rounded-2xl shadow-2xl">
-        {/* Placeholder pentru Logo */}
-        <div className="flex justify-center mb-6">
-          <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900 rounded-full flex items-center justify-center">
+    <div className="app-page flex items-center justify-center">
+      <div className="glass-card w-full max-w-xl p-10">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/20 bg-white/5">
             <svg
-              className="w-8 h-8 text-indigo-600 dark:text-indigo-400"
+              className="h-8 w-8 text-indigo-300"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -173,164 +157,136 @@ export default function LoginPage() {
               ></path>
             </svg>
           </div>
+          <div>
+            <p className="app-pill">Welcome back</p>
+            <h1 className="mt-3 text-3xl font-semibold text-white">
+              Sign in to continue
+            </h1>
+            <p className="mt-2 text-sm text-slate-300">
+              Access the unified glass workspace across dashboard and editor.
+            </p>
+          </div>
         </div>
 
-        <div>
-          <h2 className="text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-            Welcome Back
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            Please sign in to your account
-          </p>
-        </div>
+        {error && (
+          <div className="mt-6 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            {error}
+          </div>
+        )}
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm transition-opacity duration-300">
-              {error}
-            </div>
-          )}
-
-          <div className="space-y-5">
-            {/* Câmpul Username */}
-            <div>
-              <label
-                htmlFor="username"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
-                Username
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  {/* --- ICONIȚĂ MODIFICATĂ --- */}
-                  <CircleUserIcon className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="username"
-                  name="username"
-                  type="text"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="appearance-none relative block w-full pl-10 pr-3 py-2.5 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 transition-colors"
-                  placeholder="Enter your username"
-                />
-              </div>
-            </div>
-
-            {/* Câmpul Password */}
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
-                Password
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  {/* --- ICONIȚĂ MODIFICATĂ --- */}
-                  <KeyIcon className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"} // Comută tipul inputului
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none relative block w-full pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 transition-colors"
-                  placeholder="Enter your password"
-                />
-                <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center">
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-gray-400 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-                  >
-                    {showPassword ? (
-                      <EyeOffIcon className="h-5 w-5" />
-                    ) : (
-                      <EyeIcon className="h-5 w-5" />
-                    )}
-                  </button>
-                </div>
-              </div>
+          <div className="space-y-2">
+            <label
+              htmlFor="username"
+              className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400"
+            >
+              Username
+            </label>
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5">
+              <CircleUserIcon className="h-5 w-5 text-slate-400" />
+              <input
+                id="username"
+                name="username"
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your username"
+                className="h-11 flex-1 bg-transparent text-base text-slate-50 placeholder:text-slate-400 focus:outline-none"
+              />
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-6">
-            <div className="flex items-center">
+          <div className="space-y-2">
+            <label
+              htmlFor="password"
+              className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400"
+            >
+              Password
+            </label>
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5">
+              <KeyIcon className="h-5 w-5 text-slate-400" />
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                className="h-11 flex-1 bg-transparent text-base text-slate-50 placeholder:text-slate-400 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-slate-400 transition hover:text-slate-200"
+              >
+                {showPassword ? (
+                  <EyeOffIcon className="h-5 w-5" />
+                ) : (
+                  <EyeIcon className="h-5 w-5" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-300">
+            <label className="inline-flex items-center gap-2">
               <input
                 id="remember-me"
                 name="remember-me"
                 type="checkbox"
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 rounded cursor-pointer"
+                className="h-4 w-4 rounded-md border-white/30 bg-transparent text-indigo-400 focus:ring-indigo-400"
               />
-              <label
-                htmlFor="remember-me"
-                className="ml-2 block text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
-              >
-                Remember me
-              </label>
-            </div>
-
-            <div className="text-sm">
-              <a
-                href="http://localhost:3000/forget"
-                className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
-              >
-                Forgot password?
-              </a>
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-semibold rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-300 ease-in-out shadow-md hover:shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30"
+              Remember me
+            </label>
+            <a
+              href="/forget"
+              className="font-medium text-indigo-300 transition hover:text-indigo-100"
             >
-              {isLoading ? (
-                <span className="flex items-center">
-                  <svg
-                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Signing in...
-                </span>
-              ) : (
-                "Sign in"
-              )}
-            </button>
+              Forgot password?
+            </a>
           </div>
+
+          <button type="submit" disabled={isLoading} className="app-button w-full">
+            {isLoading ? (
+              <span className="flex items-center gap-2 text-sm">
+                <svg
+                  className="h-4 w-4 animate-spin text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Signing in...
+              </span>
+            ) : (
+              "Sign in"
+            )}
+          </button>
         </form>
 
-        <div className="text-center mt-8">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Don't have an account?{" "}
-            <a
-              href="/register"
-              className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
-            >
-              Sign up
-            </a>
-          </p>
+        <div className="mt-8 text-center text-sm text-slate-400">
+          Don’t have an account?{" "}
+          <a
+            href="/register"
+            className="font-semibold text-indigo-300 transition hover:text-indigo-100"
+          >
+            Create one
+          </a>
         </div>
       </div>
     </div>

@@ -1908,16 +1908,14 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen bg-gray-100 dark:bg-gray-950 items-center justify-center">
-        <p className="text-xl text-gray-700 dark:text-gray-300">
-          Se incarca...
-        </p>
+      <div className="app-page flex min-h-screen items-center justify-center text-slate-200">
+        <p className="text-xl">Se incarca...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-950">
+    <div className="flex min-h-screen text-slate-50">
       {isSidebarOpen && (
         <div
           className="fixed inset-0 z-20 bg-black opacity-50 lg:hidden"

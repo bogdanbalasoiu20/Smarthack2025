@@ -766,16 +766,14 @@ export default function SettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen bg-gray-100 dark:bg-gray-950 items-center justify-center">
-        <p className="text-xl text-gray-700 dark:text-gray-300">
-          Se încarcă...
-        </p>
+      <div className="app-page flex min-h-screen items-center justify-center text-slate-200">
+        <p className="text-xl">Se încarcă...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-950">
+    <div className="flex min-h-screen text-slate-50">
       {/* Overlay pentru meniu mobil */}
       {isSidebarOpen && (
         <div

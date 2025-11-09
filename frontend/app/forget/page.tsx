@@ -77,8 +77,8 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 p-8 sm:p-12 rounded-2xl shadow-2xl">
+    <div className="app-page flex items-center justify-center">
+      <div className="glass-card w-full max-w-md p-8 sm:p-12">
         {/* Placeholder pentru Logo (păstrat din modelul tău) */}
         <div className="flex justify-center mb-6">
           <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900 rounded-full flex items-center justify-center">

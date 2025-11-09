@@ -195,9 +195,9 @@ export default function RegisterPage() {
 
   return (
     // Fundal identic cu cel de login
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12">
+    <div className="app-page flex items-center justify-center">
       {/* Cardul pentru formular */}
-      <div className="max-w-sm w-full bg-white dark:bg-gray-800 p-8 rounded-xl border border-gray-200/80 dark:border-gray-700/50 shadow-lg">
+      <div className="glass-card w-full max-w-lg p-10">
         <div>
           <h2 className="text-center text-3xl font-bold text-gray-900 dark:text-white">
             Create Account
