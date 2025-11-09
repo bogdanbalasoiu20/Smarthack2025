@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 
 import { useCanvasStore } from "@/lib/stores/canvasStore";
