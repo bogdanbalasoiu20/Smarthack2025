@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { getStoredToken } from '@/lib/authToken';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api';
@@ -21,7 +21,7 @@ const QUICK_PROMPTS = [
 const PROMPT_TIPS = [
   'Mention the audience and tone so AI can adapt the voice.',
   'List the key points, milestones, or data you must cover.',
-  'Add KPIs or heroic stats the AI should highlight.',
+  'Add KPIs or metrics the AI should highlight.',
 ];
 
 export default function AIGenerateDialog({ open, onOpenChange, onSuccess }: AIGenerateDialogProps) {
@@ -39,34 +39,12 @@ export default function AIGenerateDialog({ open, onOpenChange, onSuccess }: AIGe
     setStatus('Ready to brainstorm with you.');
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-
-    const handleKeydown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !submitting) {
-        onOpenChange(false);
-      }
-      if ((event.metaKey || event.ctrlKey) === true && event.key === 'Enter' && !submitting) {
-        event.preventDefault();
-        handleSubmit();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeydown);
-    return () => window.removeEventListener('keydown', handleKeydown);
-  }, [open, submitting, onOpenChange, handleSubmit]);
-
   const formattedSlides = useMemo(() => {
     if (!numSlides) return null;
     const parsed = parseInt(numSlides, 10);
     if (Number.isNaN(parsed)) return null;
     return parsed;
   }, [numSlides]);
-
-  const closeDialog = () => {
-    if (submitting) return;
-    onOpenChange(false);
-  };
 
   const handleSubmit = useCallback(async () => {
     if (submitting) return;
@@ -82,7 +60,7 @@ export default function AIGenerateDialog({ open, onOpenChange, onSuccess }: AIGe
 
     setError(null);
     setSubmitting(true);
-    setStatus('Talking with the AI studio. This usually takes ~10 seconds.');
+    setStatus('Talking with the AI studio. This usually takes around ten seconds.');
 
     try {
       const token = getStoredToken();
@@ -120,12 +98,34 @@ export default function AIGenerateDialog({ open, onOpenChange, onSuccess }: AIGe
     }
   }, [formattedSlides, onOpenChange, onSuccess, prompt, submitting]);
 
+  const closeDialog = useCallback(() => {
+    if (submitting) return;
+    onOpenChange(false);
+  }, [onOpenChange, submitting]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeDialog();
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+        event.preventDefault();
+        handleSubmit();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  }, [open, handleSubmit, closeDialog]);
+
   const handleExampleClick = (example: string) => {
     setPrompt(example);
     setError(null);
   };
 
-  const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
+  const handleOverlayClick = (event: MouseEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) {
       closeDialog();
     }
@@ -169,8 +169,8 @@ export default function AIGenerateDialog({ open, onOpenChange, onSuccess }: AIGe
               <span className="rounded-full border border-white/15 px-3 py-1">Design cues</span>
             </div>
             <p className="text-base text-white/80">
-              Describe the story, audience, tone, or metrics you want highlighted. AI will craft slides,
-              speaking points, and structure for you.
+              Describe the story, audience, tone, or metrics you want highlighted. The AI will craft slides,
+              talking points, and structure for you.
             </p>
             <div className="space-y-3">
               {QUICK_PROMPTS.map((example) => (
@@ -180,8 +180,8 @@ export default function AIGenerateDialog({ open, onOpenChange, onSuccess }: AIGe
                   onClick={() => handleExampleClick(example)}
                   className="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-white/80 transition hover:border-white/30 hover:bg-white/10"
                 >
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 text-lg">
-                    ✨
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 text-xs font-semibold tracking-wide text-white/80">
+                    AI
                   </span>
                   <span className="group-hover:text-white">{example}</span>
                 </button>
@@ -229,7 +229,7 @@ export default function AIGenerateDialog({ open, onOpenChange, onSuccess }: AIGe
                 <ul className="space-y-2 rounded-2xl border border-white/10 bg-slate-950/20 p-4 text-xs text-white/70">
                   {PROMPT_TIPS.map((tip) => (
                     <li key={tip} className="flex gap-2">
-                      <span className="text-indigo-300">•</span>
+                      <span className="text-indigo-300">-</span>
                       <span>{tip}</span>
                     </li>
                   ))}
